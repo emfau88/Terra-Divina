@@ -1,0 +1,262 @@
+/**
+ * ResourceSystem — Phase 7
+ *
+ * Verarbeitet pro Simulations-Tick:
+ * 1. Passive Ressourcen-Income (Farmen, Holzfäller-Häuser)
+ * 2. Gatherer/Builder: Ressourcen aufnehmen und nach Hause bringen
+ *    (Bewegung wird von UnitAI übernommen — hier nur die Übergabe)
+ * 3. Dorf-Spawn: neue Einheit wenn genug Nahrung
+ * 4. Dorf-Bau: neues Gebäude wenn genug Holz + Nahrung
+ * 5. Level-Up: wenn genug Holz
+ *
+ * Kein Phaser. Mutiert nur Village-, Unit- und WorldGrid-State.
+ */
+
+import { VillageManager }  from '@game/factions/VillageManager';
+import { UnitManager }     from '@game/units/UnitManager';
+import { WorldGrid }       from '@game/world/WorldGrid';
+import { TileType }        from '@game/world/TileTypes';
+import { FACTION_KEYS, FactionKey } from '@game/factions/Faction';
+import { Unit }            from '@game/units/Unit';
+import { BALANCE }         from '@game/data/balance';
+import { BuildingType }    from '@game/data/buildingDefs';
+
+function choice<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function dist(ax: number, ay: number, bx: number, by: number): number {
+  return Math.hypot(ax - bx, ay - by);
+}
+
+export class ResourceSystem {
+  private readonly villages: VillageManager;
+  private readonly units:    UnitManager;
+  private readonly grid:     WorldGrid;
+
+  /** Callbacks die nach einem Dorf-Spawn / Gebäude-Bau aufgerufen werden,
+   *  damit GameScene Renderer aktualisieren kann. */
+  onSpawn:   ((faction: FactionKey) => void) | null = null;
+  onBuild:   ((faction: FactionKey) => void) | null = null;
+
+  constructor(
+    villages: VillageManager,
+    units:    UnitManager,
+    grid:     WorldGrid,
+  ) {
+    this.villages = villages;
+    this.units    = units;
+    this.grid     = grid;
+  }
+
+  // ─── Haupt-Tick ──────────────────────────────────────────────────────────
+
+  tick(steps: number): void {
+    for (let s = 0; s < steps; s++) {
+      for (const key of FACTION_KEYS) {
+        this.passiveIncome(key);
+        this.unitResourceTick(key);
+        this.trySpawn(key);
+        this.tryBuild(key);
+        this.tryLevelUp(key);
+      }
+    }
+  }
+
+  // ─── Passives Einkommen ──────────────────────────────────────────────────
+
+  private passiveIncome(faction: FactionKey): void {
+    const v = this.villages.villages[faction];
+    if (!v) return;
+
+    const farms  = v.buildings.filter(b => b.type === 'farm').length;
+    const yards  = v.buildings.filter(b => b.type === 'wood').length;
+
+    v.food += BALANCE.FOOD_PASSIVE_BASE + farms  * BALANCE.FOOD_PER_FARM;
+    v.wood += BALANCE.WOOD_PASSIVE_BASE + yards  * BALANCE.WOOD_PER_YARD;
+  }
+
+  // ─── Einheiten-Ressourcen-Tick ───────────────────────────────────────────
+
+  private unitResourceTick(faction: FactionKey): void {
+    const v = this.villages.villages[faction];
+    if (!v) return;
+
+    for (const u of this.units.units) {
+      if (u.dead || u.faction !== faction) continue;
+
+      if (u.role === 'gatherer') this.gathererTick(u, faction);
+      if (u.role === 'builder')  this.builderTick(u, faction);
+    }
+  }
+
+  private gathererTick(u: Unit, faction: FactionKey): void {
+    const v = this.villages.villages[faction];
+    if (!v) return;
+
+    // Voll beladen → nach Hause
+    if (u.carryFood + u.carryWood >= 3) {
+      this.returnHome(u, faction);
+      return;
+    }
+
+    const here = this.grid.get(u.x, u.y);
+
+    // Wald → Holz hacken
+    if (here === TileType.Forest && Math.random() < 0.58) {
+      u.state = 'chop';
+      u.carryWood++;
+      if (Math.random() < 0.08) this.grid.set(u.x, u.y, TileType.Grass);
+      return;
+    }
+
+    // Gras / Sand / Weg → Nahrung sammeln
+    if (
+      (here === TileType.Grass || here === TileType.Sand || here === TileType.Road)
+      && Math.random() < 0.24
+    ) {
+      u.state = 'forage';
+      u.carryFood++;
+      return;
+    }
+
+    u.state = 'wander';
+  }
+
+  private builderTick(u: Unit, faction: FactionKey): void {
+    const v = this.villages.villages[faction];
+    if (!v) return;
+
+    if (u.carryFood + u.carryWood >= 2) {
+      this.returnHome(u, faction);
+      return;
+    }
+
+    // Beschädigtes Gebäude in Nähe reparieren
+    const damaged = this.villages.buildings.find(b =>
+      !b.dead &&
+      b.faction === faction &&
+      b.hp < b.maxHp &&
+      dist(u.x, u.y, b.x, b.y) < 8,
+    );
+    if (damaged && dist(u.x, u.y, damaged.x, damaged.y) <= 1) {
+      u.state = 'repair';
+      damaged.hp = Math.min(damaged.maxHp, damaged.hp + 4);
+      return;
+    }
+
+    // Holz hacken
+    if (this.grid.get(u.x, u.y) === TileType.Forest && Math.random() < 0.5) {
+      u.state = 'chop';
+      u.carryWood++;
+      return;
+    }
+
+    u.state = 'wander';
+  }
+
+  private returnHome(u: Unit, faction: FactionKey): void {
+    const v = this.villages.villages[faction];
+    if (!v) return;
+
+    u.state = 'return';
+
+    if (Math.abs(u.x - v.x) <= 1 && Math.abs(u.y - v.y) <= 1) {
+      v.food      += u.carryFood;
+      v.wood      += u.carryWood;
+      u.carryFood  = 0;
+      u.carryWood  = 0;
+      u.hp = Math.min(u.maxHp, u.hp + 2); // kleines Heimheil
+    }
+  }
+
+  // ─── Dorf-Aktionen ───────────────────────────────────────────────────────
+
+  private trySpawn(faction: FactionKey): void {
+    const v = this.villages.villages[faction];
+    if (!v) return;
+
+    const pop = this.units.liveCount(faction);
+    const cap = this.popCap(faction);
+    if (v.food < BALANCE.SPAWN_FOOD_COST || pop >= cap) return;
+
+    v.food -= BALANCE.SPAWN_FOOD_COST;
+    const u = this.units.spawnUnit(faction);
+    if (u) this.onSpawn?.(faction);
+  }
+
+  private tryBuild(faction: FactionKey): void {
+    const v = this.villages.villages[faction];
+    if (!v) return;
+
+    const maxBuildings = 5 + v.level * 5;
+    if (
+      v.wood  < BALANCE.BUILD_WOOD_COST ||
+      v.food  < BALANCE.BUILD_FOOD_COST ||
+      v.buildings.length >= maxBuildings
+    ) return;
+
+    if (!this.growVillage(faction)) return;
+
+    v.wood -= BALANCE.BUILD_WOOD_COST;
+    v.food -= BALANCE.BUILD_FOOD_COST;
+    this.onBuild?.(faction);
+  }
+
+  private tryLevelUp(faction: FactionKey): void {
+    const v = this.villages.villages[faction];
+    if (!v || v.level >= 8) return;
+    if (v.wood < BALANCE.LEVEL_UP_WOOD_COST) return;
+    v.wood -= BALANCE.LEVEL_UP_WOOD_COST;
+    v.level++;
+    this.onBuild?.(faction); // Neuzeichnen
+  }
+
+  // ─── Dorf wachsen lassen ─────────────────────────────────────────────────
+
+  private growVillage(faction: FactionKey): boolean {
+    const v = this.villages.villages[faction];
+    if (!v) return false;
+
+    const pool: BuildingType[] = [
+      'hut', 'farm', 'wood', 'hut', 'farm',
+      v.level >= 3 ? 'tower'    : 'hut',
+      v.level >= 2 ? 'outpost'  : 'hut',
+      v.level >= 4 ? 'barracks' : 'hut',
+    ];
+    const type = choice(pool);
+    const radius = 4 + v.level;
+
+    // Kandidaten: begehbare, freie Felder in Radius
+    const candidates: Array<{ x: number; y: number; d: number }> = [];
+    for (let yy = v.y - radius; yy <= v.y + radius; yy++) {
+      for (let xx = v.x - radius; xx <= v.x + radius; xx++) {
+        if (!this.grid.isWalkable(xx, yy)) continue;
+        if (this.villages.buildingAt(xx, yy))  continue;
+        const d = dist(xx, yy, v.x, v.y);
+        if (d > radius) continue;
+        candidates.push({ x: xx, y: yy, d });
+      }
+    }
+    // Nächste Felder bevorzugen
+    candidates.sort((a, b) => a.d - b.d);
+
+    for (const p of candidates) {
+      const b = this.villages.addBuilding(faction, type, p.x, p.y);
+      if (b) {
+        this.villages.makeRoads(faction);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // ─── Hilfsmethoden ───────────────────────────────────────────────────────
+
+  popCap(faction: FactionKey): number {
+    const v = this.villages.villages[faction];
+    if (!v) return 22;
+    const huts = v.buildings.filter(b => b.type === 'hut').length;
+    return Math.min(BALANCE.MAX_UNITS_PER_FACTION, 22 + v.level * 8 + huts * 6);
+  }
+}

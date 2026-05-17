@@ -1,0 +1,101 @@
+/**
+ * CombatSystem — Phase 7
+ *
+ * Verarbeitet Nahkampf zwischen Einheiten und Angriffe auf Gebäude.
+ * Kein Phaser. Mutiert nur Unit- und Building-State.
+ */
+
+import { Unit }           from './Unit';
+import { Building }       from '@game/factions/Building';
+import { VillageManager } from '@game/factions/VillageManager';
+
+function randi(min: number, max: number): number {
+  return Math.floor(min + Math.random() * (max - min + 1));
+}
+
+function dist(ax: number, ay: number, bx: number, by: number): number {
+  return Math.hypot(ax - bx, ay - by);
+}
+
+export class CombatSystem {
+  private readonly villages: VillageManager;
+
+  constructor(villages: VillageManager) {
+    this.villages = villages;
+  }
+
+  // ─── Einheit vs. Einheit ─────────────────────────────────────────────────
+
+  fight(attacker: Unit, defender: Unit): boolean {
+    if (attacker.cd > 0) return false;
+    const dmg = randi(3, 7);
+    defender.hp -= dmg;
+    if (defender.hp <= 0) {
+      defender.hp    = 0;
+      defender.dead  = true;
+      defender.state = 'wounded';
+    } else {
+      defender.state = 'fight';
+    }
+    attacker.state = 'fight';
+    attacker.cd    = 3;
+    return true;
+  }
+
+  // ─── Einheit vs. Gebäude ─────────────────────────────────────────────────
+
+  attackBuilding(attacker: Unit, building: Building): boolean {
+    if (attacker.cd > 0) return false;
+    if (building.dead)   return false;
+
+    const minHp = building.isIndestructible ? 1 : 0;
+    const dmg   = randi(2, 5);
+    building.hp = Math.max(minHp, building.hp - dmg);
+
+    if (building.hp <= 0) {
+      this.villages.destroyBuilding(building);
+      // Plünderer bekommen Holz
+      const loot = this.villages.villages[attacker.faction];
+      if (loot) loot.wood += 4;
+    }
+
+    attacker.state = 'raid';
+    attacker.cd    = 4;
+    return true;
+  }
+
+  // ─── Nachbarn finden ─────────────────────────────────────────────────────
+
+  nearestEnemy(u: Unit, allUnits: Unit[], radius: number): Unit | null {
+    let closest: Unit | null = null;
+    let minD = Infinity;
+    for (const other of allUnits) {
+      if (other.dead || other.faction === u.faction) continue;
+      const d = dist(u.x, u.y, other.x, other.y);
+      if (d < radius && d < minD) { minD = d; closest = other; }
+    }
+    return closest;
+  }
+
+  nearestEnemyBuilding(u: Unit, radius: number): Building | null {
+    let closest: Building | null = null;
+    let minD = Infinity;
+    for (const b of this.villages.buildings) {
+      if (b.dead || b.faction === u.faction) continue;
+      const d = dist(u.x, u.y, b.x, b.y);
+      if (d < radius && d < minD) { minD = d; closest = b; }
+    }
+    return closest;
+  }
+
+  nearestDamagedFriendly(u: Unit, radius: number): Building | null {
+    let closest: Building | null = null;
+    let minD = Infinity;
+    for (const b of this.villages.buildings) {
+      if (b.dead || b.faction !== u.faction || b.hp >= b.maxHp) continue;
+      const d = dist(u.x, u.y, b.x, b.y);
+      if (d < radius && d < minD) { minD = d; closest = b; }
+    }
+    return closest;
+  }
+}
