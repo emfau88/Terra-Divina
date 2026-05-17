@@ -10,10 +10,12 @@
     "skipLibCheck": true,
     "sourceMap": true,
     "outDir": "dist",
-    "baseUrl": ".",
+    "rootDir": "src",
+    "ignoreDeprecations": "5.0",
+    "baseUrl": "./src",
     "paths": {
-      "@game/*": ["src/game/*"],
-      "@styles/*": ["src/styles/*"]
+      "@game/*": ["game/*"],
+      "@styles/*": ["styles/*"]
     }
   },
   "include": ["src"]
