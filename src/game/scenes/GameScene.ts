@@ -309,11 +309,11 @@ export class GameScene extends Phaser.Scene {
       if (!ui) return;
       const tool = ui.getActiveTool();
 
-      const cam = this.cameras.main;
-      const wx  = pointer.x + cam.scrollX;
-      const wy  = pointer.y + cam.scrollY - WORLD_Y;
-      const tx  = Math.floor(wx / TILE);
-      const ty  = Math.floor(wy / TILE);
+      // Use Phaser's pointer.worldX/worldY which correctly applies zoom,
+      // camera scroll, and viewport offset. Manual reconstruction with
+      // pointer.x + cam.scrollX was wrong at zoom != 1.0.
+      const tx = Math.floor(pointer.worldX / TILE);
+      const ty = Math.floor(pointer.worldY / TILE);
 
       if (!this.grid.inBounds(tx, ty)) return;
 

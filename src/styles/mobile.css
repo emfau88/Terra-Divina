@@ -15,37 +15,41 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 
   /* ── background layers ── */
-  --bg:         #07101f;
-  --ui-bg:      #0d1824;
-  --ui-panel:   #111f30;
-  --ui-panel-2: #172840;
-  --ui-surface: rgba(13, 24, 36, 0.96);
+  --bg:         #0b0e09;
+  --ui-bg:      #10130f;
+  --ui-panel:   #1c2118;
+  --ui-panel-2: #2b3324;
+  --ui-surface: rgba(16, 19, 15, 0.96);
 
   /* ── borders ── */
-  --ui-border:    rgba(255, 255, 255, 0.10);
-  --ui-border-hi: rgba(119, 215, 255, 0.30);
-  --stroke:       rgba(255, 255, 255, 0.10);
+  --ui-border:    #4c5a3d;
+  --ui-border-hi: #9fbd6a;
+  --stroke:       rgba(255, 255, 255, 0.08);
 
   /* ── text ── */
-  --text:  #eef6ff;
-  --muted: #7a9ab8;
+  --text:  #f3ead2;
+  --muted: #b8ad93;
 
   /* ── accent palette ── */
-  --accent:      #77d7ff;   /* divine cyan  */
-  --accent-gold: #f2b84b;   /* warm gold    */
-  --danger:      #e05050;   /* destruction  */
-  --heal:        #64d987;   /* nature/life  */
-  --terrain-green: #8bc47a; /* terrain      */
+  --accent:        #9fbd6a;   /* earthy green (primary accent) */
+  --accent-gold:   #d9a441;   /* warm gold                     */
+  --accent-earth:  #8b6840;   /* stone/wood brown              */
+  --accent-nature: #69a85b;   /* forest green                  */
+  --accent-danger: #c8573a;   /* destruction red               */
+  --accent-water:  #4f9db4;   /* water/magic blue              */
+  --danger:        #c8573a;
+  --heal:          #69a85b;
+  --terrain-green: #69a85b;
 
   /* ── faction colours ── */
-  --human-color: #5ec8ff;
-  --orc-color:   #ff5d63;
-  --elf-color:   #6dff8a;
-  --dwarf-color: #d4a04a;
+  --human-color: #d9a441;
+  --orc-color:   #c8573a;
+  --elf-color:   #69a85b;
+  --dwarf-color: #8b6840;
 
   /* ── dock panel ── */
-  --dock-bg:          linear-gradient(180deg, #172232 0%, #0f1a28 100%);
-  --dock-border-top:  1px solid rgba(119, 215, 255, 0.12);
+  --dock-bg:          linear-gradient(180deg, #1c2118 0%, #10130f 100%);
+  --dock-border-top:  1px solid #4c5a3d;
   --dock-tab-h:       50px;
   --dock-tool-h:      60px;
 }
@@ -254,22 +258,14 @@ html, body {
 
 .dock-cat-btn:active { opacity: 0.7; }
 
-/* ── SVG category icon ── */
+/* ── Category glyph ── */
 .cat-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 16px;
+  font-weight: 700;
   line-height: 1;
-}
-
-.cat-icon--svg {
-  width: 22px;
-  height: 22px;
-}
-.cat-icon--svg svg {
-  width: 100%; height: 100%;
-  display: block;
 }
 
 .cat-label {
@@ -337,9 +333,9 @@ html, body {
   border-color: var(--cat-accent, var(--accent));
   color: var(--cat-accent, var(--accent));
   box-shadow:
-    0 0 0 1px rgba(119,215,255,0.15),
-    0 0 10px rgba(119,215,255,0.12),
-    inset 0 1px 0 rgba(255,255,255,0.08);
+    0 0 0 1px rgba(159,189,106,0.18),
+    0 0 10px rgba(159,189,106,0.10),
+    inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
 /* wide variant used for pause button */
@@ -347,24 +343,14 @@ html, body {
   width: calc(50% - 4px);
 }
 
-/* ── SVG tool icon ── */
-.tool-icon {
+/* ── Tool glyph / icon ── */
+.tool-glyph, .tool-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 20px;
+  font-weight: 700;
   line-height: 1;
-  /* inherit color so SVG currentColor works */
-  color: inherit;
-}
-
-.tool-icon--svg {
-  width: 28px;
-  height: 28px;
-}
-.tool-icon--svg svg {
-  width: 100%; height: 100%;
-  display: block;
   color: inherit;
 }
 

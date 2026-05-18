@@ -15,13 +15,13 @@ export const CANVAS_H = 1280;
  * Height of the top HUD DOM overlay in CSS pixels.
  * Must match --hud-h in mobile.css.
  */
-export const HUD_H_CSS = 88;
+export const HUD_H_CSS = 90;
 
 /**
  * Height of the bottom tool dock DOM overlay in CSS pixels.
  * Must match --dock-h in mobile.css.
  */
-export const DOCK_H_CSS = 152;
+export const DOCK_H_CSS = 174;
 
 /**
  * The fraction of CANVAS_H reserved for the top HUD in Phaser units.

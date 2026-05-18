@@ -3,31 +3,18 @@ import { GameScene } from './GameScene';
 import { SpeedIndex } from '@game/simulation/SimulationClock';
 import { GOAL_DAYS } from '@game/simulation/GoalSystem';
 import { FACTIONS } from '@game/factions/Faction';
-import { getToolIcon } from '@game/ui/toolIcons';
-
-/**
- * UIScene — Visual Phase V1
- *
- * Kategorisierter God-Toolbox-Dock mit SVG-Icons.
- * Alle Tool- und Kategorie-Icons kommen aus dem zentralen toolIcons-Registry.
- * Emoji werden als Fallback verwendet, falls ein Key nicht im Registry ist.
- */
 
 type CategoryKey = 'destruction' | 'nature' | 'civilizations' | 'creatures' | 'terrain' | 'more';
 
 interface ToolEntry {
   key: string;
-  /** emoji fallback — wird nur angezeigt wenn kein SVG-Icon vorhanden */
-  fallbackIcon: string;
+  glyph: string;
   label: string;
 }
 
 interface CategoryDef {
   key: CategoryKey;
-  /** Icon-Key aus toolIcons.ts (cat-* Prefix) */
-  iconKey: string;
-  /** Emoji fallback für den Tab */
-  fallbackIcon: string;
+  glyph: string;
   label: string;
   hint: string;
   tools: ToolEntry[];
@@ -36,84 +23,78 @@ interface CategoryDef {
 const CATEGORIES: CategoryDef[] = [
   {
     key: 'destruction',
-    iconKey: 'cat-destruction',
-    fallbackIcon: '💥',
+    glyph: '⚡',
     label: 'Zerstörung',
     hint: 'Blitz, Feuer und Meteor verändern die Welt mit Gewalt.',
     tools: [
-      { key: 'lightning',       fallbackIcon: 'ϟ',  label: 'Blitz'  },
-      { key: 'fire',            fallbackIcon: '🔥', label: 'Feuer'  },
-      { key: 'meteor',          fallbackIcon: '☄',  label: 'Meteor' },
+      { key: 'lightning', glyph: 'ϟ', label: 'Blitz'  },
+      { key: 'fire',      glyph: '✦', label: 'Feuer'  },
+      { key: 'meteor',    glyph: '★', label: 'Meteor' },
     ],
   },
   {
     key: 'nature',
-    iconKey: 'cat-nature',
-    fallbackIcon: '🌿',
+    glyph: '❧',
     label: 'Natur',
     hint: 'Bringe Regen oder heile das Land.',
     tools: [
-      { key: 'rain', fallbackIcon: '☔', label: 'Regen'  },
-      { key: 'heal', fallbackIcon: '✚', label: 'Heilen' },
+      { key: 'rain', glyph: '↓', label: 'Regen'  },
+      { key: 'heal', glyph: '✚', label: 'Heilen' },
     ],
   },
   {
     key: 'civilizations',
-    iconKey: 'cat-civilizations',
-    fallbackIcon: '🏘',
+    glyph: '⌂',
     label: 'Völker',
     hint: 'Erschaffe Zivilisationen und beobachte, wie sie wachsen.',
     tools: [
-      { key: 'human', fallbackIcon: '👤', label: 'Mensch' },
-      { key: 'orc',   fallbackIcon: '👹', label: 'Ork'    },
-      { key: 'elf',   fallbackIcon: '🧝', label: 'Elfe'   },
-      { key: 'dwarf', fallbackIcon: '⛏',  label: 'Zwerg'  },
+      { key: 'human', glyph: 'H', label: 'Mensch' },
+      { key: 'orc',   glyph: 'O', label: 'Ork'    },
+      { key: 'elf',   glyph: 'E', label: 'Elfe'   },
+      { key: 'dwarf', glyph: 'Z', label: 'Zwerg'  },
     ],
   },
   {
     key: 'creatures',
-    iconKey: 'cat-creatures',
-    fallbackIcon: '🐾',
+    glyph: '♦',
     label: 'Kreaturen',
     hint: 'Setze wilde Kreaturen in die Welt.',
     tools: [
-      { key: 'wolf',  fallbackIcon: '🐺', label: 'Wolf'  },
-      { key: 'demon', fallbackIcon: '👿', label: 'Dämon' },
+      { key: 'wolf',  glyph: 'W', label: 'Wolf'  },
+      { key: 'demon', glyph: 'D', label: 'Dämon' },
     ],
   },
   {
     key: 'terrain',
-    iconKey: 'cat-terrain',
-    fallbackIcon: '🗺',
+    glyph: '◈',
     label: 'Terrain',
     hint: 'Male das Land neu: Gras, Wasser, Wald, Berge.',
     tools: [
-      { key: 'terrain-grass',    fallbackIcon: '🟩', label: 'Gras'   },
-      { key: 'terrain-water',    fallbackIcon: '🟦', label: 'Wasser' },
-      { key: 'terrain-forest',   fallbackIcon: '🌲', label: 'Wald'   },
-      { key: 'terrain-mountain', fallbackIcon: '⛰',  label: 'Berg'   },
-      { key: 'terrain-sand',     fallbackIcon: '🟨', label: 'Sand'   },
+      { key: 'terrain-grass',    glyph: '▪', label: 'Gras'   },
+      { key: 'terrain-water',    glyph: '≈', label: 'Wasser' },
+      { key: 'terrain-forest',   glyph: '♣', label: 'Wald'   },
+      { key: 'terrain-mountain', glyph: '▲', label: 'Berg'   },
+      { key: 'terrain-sand',     glyph: '·', label: 'Sand'   },
     ],
   },
   {
     key: 'more',
-    iconKey: 'cat-more',
-    fallbackIcon: '⋯',
+    glyph: '⋯',
     label: 'Mehr',
     hint: 'Inspizieren, pausieren und Geschwindigkeit anpassen.',
     tools: [
-      { key: 'inspect', fallbackIcon: 'ⓘ', label: 'Info' },
+      { key: 'inspect', glyph: 'ⓘ', label: 'Info' },
     ],
   },
 ];
 
 // ─── Category accent colors (used as CSS custom property on each tab) ────────
 const CAT_ACCENT: Record<CategoryKey, string> = {
-  destruction:    'var(--danger)',
-  nature:         'var(--heal)',
-  civilizations:  'var(--accent)',
-  creatures:      'var(--accent-gold)',
-  terrain:        '#8bc47a',
+  destruction:    'var(--accent-danger)',
+  nature:         'var(--accent-nature)',
+  civilizations:  'var(--accent-gold)',
+  creatures:      '#a05080',
+  terrain:        'var(--accent-earth)',
   more:           'var(--muted)',
 };
 
@@ -203,12 +184,7 @@ export class UIScene extends Phaser.Scene {
       tab.setAttribute('aria-label', cat.label);
       tab.style.setProperty('--cat-accent', CAT_ACCENT[cat.key]);
 
-      const svgIcon = getToolIcon(cat.iconKey);
-      const iconHtml = svgIcon
-        ? `<span class="cat-icon cat-icon--svg">${svgIcon}</span>`
-        : `<span class="cat-icon">${cat.fallbackIcon}</span>`;
-
-      tab.innerHTML = `${iconHtml}<span class="cat-label">${cat.label}</span>`;
+      tab.innerHTML = `<span class="cat-icon">${cat.glyph}</span><span class="cat-label">${cat.label}</span>`;
       tab.addEventListener('pointerdown', (e) => {
         e.stopPropagation();
         this.switchCategory(cat.key);
@@ -227,7 +203,7 @@ export class UIScene extends Phaser.Scene {
       grid.dataset['category'] = cat.key;
 
       for (const t of cat.tools) {
-        const btn = this.makeToolBtn(t.key, t.label, t.fallbackIcon, cat.key);
+        const btn = this.makeToolBtn(t.key, t.label, t.glyph, cat.key);
         if (t.key === this.activeToolKey) btn.classList.add('active');
         grid.appendChild(btn);
       }
@@ -245,11 +221,10 @@ export class UIScene extends Phaser.Scene {
     document.body.appendChild(this.dockEl);
   }
 
-  /** Creates a single tool button with SVG icon (or emoji fallback). */
   private makeToolBtn(
     key: string,
     label: string,
-    fallback: string,
+    glyph: string,
     catKey: CategoryKey,
   ): HTMLButtonElement {
     const btn = document.createElement('button');
@@ -259,12 +234,7 @@ export class UIScene extends Phaser.Scene {
     btn.setAttribute('aria-label', label);
     btn.style.setProperty('--cat-accent', CAT_ACCENT[catKey]);
 
-    const svgIcon = getToolIcon(key);
-    const iconHtml = svgIcon
-      ? `<span class="tool-icon tool-icon--svg">${svgIcon}</span>`
-      : `<span class="tool-icon">${fallback}</span>`;
-
-    btn.innerHTML = `${iconHtml}<span class="tool-label">${label}</span>`;
+    btn.innerHTML = `<span class="tool-glyph">${glyph}</span><span class="tool-label">${label}</span>`;
     btn.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       this.selectTool(key);
@@ -353,12 +323,9 @@ export class UIScene extends Phaser.Scene {
   // ─── Sync helpers ─────────────────────────────────────────────────────────
 
   private setPauseContent(paused: boolean): void {
-    const svgIcon = getToolIcon(paused ? 'speed' : 'pause');
-    const label   = paused ? 'Weiter' : 'Pause';
-    const iconHtml = svgIcon
-      ? `<span class="tool-icon tool-icon--svg">${svgIcon}</span>`
-      : `<span class="tool-icon">${paused ? '▶' : '⏸'}</span>`;
-    this.pauseBtn.innerHTML = `${iconHtml}<span class="tool-label">${label}</span>`;
+    const glyph = paused ? '▶' : '⏸';
+    const label = paused ? 'Weiter' : 'Pause';
+    this.pauseBtn.innerHTML = `<span class="tool-glyph">${glyph}</span><span class="tool-label">${label}</span>`;
   }
 
   private syncPauseBtn(paused: boolean): void {
@@ -418,12 +385,12 @@ export class UIScene extends Phaser.Scene {
     if (!el) return;
     el.textContent = status;
     const colorMap: Record<string, string> = {
-      FRIEDEN:          'var(--accent)',
+      FRIEDEN:          'var(--accent-nature)',
       ANSPANNUNG:       'var(--accent-gold)',
-      KRIEG:            'var(--danger)',
-      WAFFENSTILLSTAND: 'var(--heal)',
+      KRIEG:            'var(--accent-danger)',
+      WAFFENSTILLSTAND: 'var(--accent-nature)',
     };
-    el.style.color = colorMap[status] ?? 'var(--accent)';
+    el.style.color = colorMap[status] ?? 'var(--muted)';
   }
 
   setFactionSummary(faction: string, text: string): void {
