@@ -17,6 +17,7 @@
 
 import { VillageManager } from '@game/factions/VillageManager';
 import { UnitManager }    from '@game/units/UnitManager';
+import { FACTION_KEYS }   from '@game/factions/Faction';
 import { BALANCE }        from '@game/data/balance';
 
 export type DiplomaticState = 'peace' | 'tension' | 'war' | 'truce';
@@ -52,22 +53,35 @@ export class DiplomacySystem {
   // ─── Spannung berechnen ──────────────────────────────────────────────────
 
   private updateTension(): void {
-    const hv = this.villages.villages.human;
-    const ov = this.villages.villages.orc;
-    if (!hv || !ov) return;
+    // Collect all active villages
+    const activeVillages = FACTION_KEYS
+      .map(k => this.villages.villages[k])
+      .filter((v): v is NonNullable<typeof v> => v !== undefined);
 
-    // Territorium-Überlap: je näher die Dörfer, desto mehr Druck
-    const villDist  = Math.hypot(hv.x - ov.x, hv.y - ov.y);
-    const overlapR  = (hv.territory + ov.territory);
-    const overlapPressure = villDist < overlapR
-      ? BALANCE.TENSION_OVERLAP_RATE * (1 - villDist / overlapR)
-      : 0;
+    if (activeVillages.length < 2) return;
 
-    // Kräfte-Ungleichgewicht: größere Fraktion will angreifen
-    const hPop = this.units.liveCount('human');
-    const oPop = this.units.liveCount('orc');
-    const maxPop = Math.max(1, hPop, oPop);
-    const imbalance = Math.abs(hPop - oPop) / maxPop;
+    // Territorium-Überlap: maximaler Druck über alle Paare
+    let overlapPressure = 0;
+    for (let i = 0; i < activeVillages.length; i++) {
+      for (let j = i + 1; j < activeVillages.length; j++) {
+        const av = activeVillages[i];
+        const bv = activeVillages[j];
+        const dist    = Math.hypot(av.x - bv.x, av.y - bv.y);
+        const overlapR = av.territory + bv.territory;
+        if (dist < overlapR) {
+          overlapPressure = Math.max(
+            overlapPressure,
+            BALANCE.TENSION_OVERLAP_RATE * (1 - dist / overlapR),
+          );
+        }
+      }
+    }
+
+    // Kräfte-Ungleichgewicht: stärkstes Ungleichgewicht über alle Fraktionen
+    const pops = FACTION_KEYS.map(k => this.units.liveCount(k));
+    const maxPop = Math.max(1, ...pops);
+    const minPop = Math.min(...pops.filter(p => p > 0), maxPop);
+    const imbalance = (maxPop - minPop) / maxPop;
     const imbalancePressure = imbalance > 0.3 ? BALANCE.TENSION_IMBALANCE_RATE * imbalance : 0;
 
     // Im Frieden / Anspannung: natürlicher Anstieg

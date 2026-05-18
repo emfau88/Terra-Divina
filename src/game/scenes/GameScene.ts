@@ -4,24 +4,38 @@ import { CANVAS_W, WORLD_Y, WORLD_H, TILE, COLS, ROWS, ZOOM_DEFAULT } from '@gam
 const VISUAL_SPEED_PX_PER_MS = 150 / 1000;
 import { WorldGrid }          from '@game/world/WorldGrid';
 import { WorldGenerator }     from '@game/world/WorldGenerator';
+import { WorldSetupConfig, defaultConfig } from '@game/world/WorldSetupConfig';
 import { WorldRenderer }      from '@game/rendering/WorldRenderer';
 import { BuildingRenderer }   from '@game/rendering/BuildingRenderer';
 import { UnitRenderer }       from '@game/rendering/UnitRenderer';
 import { CameraController }   from '@game/rendering/CameraController';
 import { VillageManager }     from '@game/factions/VillageManager';
+import { Village }            from '@game/factions/Village';
+import { Building }           from '@game/factions/Building';
 import { UnitManager }        from '@game/units/UnitManager';
-import { SimulationClock }    from '@game/simulation/SimulationClock';
+import { Unit }               from '@game/units/Unit';
+import { SimulationClock, SpeedIndex } from '@game/simulation/SimulationClock';
 import { ResourceSystem }     from '@game/simulation/ResourceSystem';
 import { HungerSystem }       from '@game/simulation/HungerSystem';
-import { DiplomacySystem }    from '@game/simulation/DiplomacySystem';
+import { DiplomacySystem, DiplomaticState } from '@game/simulation/DiplomacySystem';
 import { FireSystem }         from '@game/simulation/FireSystem';
 import { EffectSystem }       from '@game/effects/EffectSystem';
 import { ToolController }     from '@game/tools/ToolController';
 import { InspectPanel }       from '@game/ui/InspectPanel';
 import { EventFeed }          from '@game/ui/EventFeed';
-import { FACTIONS }           from '@game/factions/Faction';
-import { GoalSystem }         from '@game/simulation/GoalSystem';
+import { FACTIONS, FACTION_KEYS } from '@game/factions/Faction';
+import { FactionKey }             from '@game/factions/Faction';
+import { GoalSystem, GoalState } from '@game/simulation/GoalSystem';
 import { UIScene }            from './UIScene';
+import { SaveGame }           from '@game/simulation/SaveGame';
+import { SaveSystem, SAVE_VERSION } from '@game/simulation/SaveSystem';
+import { BuildingType }       from '@game/data/buildingDefs';
+import { UnitRole }           from '@game/units/UnitRoles';
+import { UnitState }          from '@game/units/Unit';
+import { TileType }           from '@game/world/TileTypes';
+import { CreatureManager }    from '@game/creatures/CreatureManager';
+import { CreatureRenderer }   from '@game/rendering/CreatureRenderer';
+import { SCENARIOS }          from '@game/simulation/ScenarioDefinition';
 
 /**
  * GameScene — Phase 13A
@@ -33,6 +47,9 @@ import { UIScene }            from './UIScene';
  * - UIScene.showResult() bei Sieg/Niederlage aufgerufen
  */
 export class GameScene extends Phaser.Scene {
+  /** Gespeicherte Weltkonfiguration — wird für Autosave benötigt. */
+  private worldConfig: WorldSetupConfig = defaultConfig();
+
   private grid!:             WorldGrid;
   private villageManager!:   VillageManager;
   private unitManager!:      UnitManager;
@@ -50,7 +67,9 @@ export class GameScene extends Phaser.Scene {
   private worldRenderer!:    WorldRenderer;
   private buildingRenderer!: BuildingRenderer;
   private unitRenderer!:     UnitRenderer;
+  private creatureRenderer!: CreatureRenderer;
   private cameraController!: CameraController;
+  private creatureManager!:  CreatureManager;
 
   private readonly worldPixelW = COLS * TILE;
   private readonly worldPixelH = ROWS * TILE;
@@ -71,17 +90,27 @@ export class GameScene extends Phaser.Scene {
     super({ key: 'GameScene' });
   }
 
-  create(): void {
+  create(data?: WorldSetupConfig): void {
+    // Restore-Payload aus Phaser-Scene-Data extrahieren (_restore ist nur beim Laden gesetzt)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const restoreSave = (data as any)?._restore as SaveGame | undefined;
+
+    // Konfiguration aus Phaser-Data-Mechanismus oder Standardwert verwenden
+    const cfg: WorldSetupConfig = restoreSave?.config ?? data ?? defaultConfig();
+
+    // Weltkonfiguration merken für spätere Autosaves
+    this.worldConfig = cfg;
+
     // 1. Welt
-    this.grid = WorldGenerator.generate();
+    this.grid = WorldGenerator.generate(cfg);
 
     // 2. Dörfer + Gebäude
     this.villageManager = new VillageManager(this.grid);
-    this.villageManager.placeStartVillages();
+    this.villageManager.placeStartVillages(cfg.factions);
 
     // 3. Einheiten
     this.unitManager = new UnitManager(this.grid, this.villageManager);
-    this.unitManager.spawnInitial();
+    this.unitManager.spawnInitial(cfg.factions);
 
     // 4. Simulations-Systeme
     this.clock          = new SimulationClock();
@@ -89,6 +118,15 @@ export class GameScene extends Phaser.Scene {
     this.hungerSystem   = new HungerSystem(this.villageManager, this.unitManager);
     this.diplomacy      = new DiplomacySystem(this.villageManager, this.unitManager);
     this.fireSystem     = new FireSystem(this.grid, this.unitManager);
+    this.creatureManager = new CreatureManager(this.grid, this.villageManager, this.fireSystem);
+
+    // Startspannung je nach gewähltem Startmodus setzen
+    switch (cfg.startMode) {
+      case 'peaceful': this.diplomacy.tension =  0;  break;
+      case 'balanced': this.diplomacy.tension = 10;  break;
+      case 'warTorn':  this.diplomacy.tension = 50;  break;
+      case 'chaos':    this.diplomacy.tension = 75;  break;
+    }
 
     // 5. UI-Systeme
     this.eventFeed    = new EventFeed();
@@ -96,6 +134,13 @@ export class GameScene extends Phaser.Scene {
 
     // 5b. Ziel-System
     this.goalSystem = new GoalSystem();
+    this.goalSystem.mode       = cfg.gameMode;
+    this.goalSystem.fireSystem = this.fireSystem;
+    this.goalSystem.diplomacy  = this.diplomacy;
+    // Szenario-Ziel aus Definition laden
+    if (cfg.gameMode === 'scenario' && cfg.scenarioId) {
+      this.goalSystem.scenarioGoal = SCENARIOS[cfg.scenarioId].goal;
+    }
     this.goalSystem.onGoalChange = (state) => {
       const ui = this.scene.get('UIScene') as UIScene | null;
       ui?.showResult(state === 'won');
@@ -104,28 +149,40 @@ export class GameScene extends Phaser.Scene {
     // 6. Callbacks
     this.resourceSystem.onSpawn = (faction) => {
       this.unitRenderer.drawAll(this.unitManager.liveUnits);
-      const fc = FACTIONS[faction];
-      this.eventFeed.push(`${fc.short} spawnt Einheit`, fc.color === 0x5ec8ff ? '#5ec8ff' : '#ff5d63');
+      const fc  = FACTIONS[faction];
+      const css = '#' + fc.color.toString(16).padStart(6, '0');
+      this.eventFeed.push(`${fc.short} spawnt Einheit`, css);
     };
     this.resourceSystem.onBuild = (faction) => {
       this.worldRenderer.drawAll();
       this.buildingRenderer.drawAll(this.villageManager.liveBuildings);
-      const fc = FACTIONS[faction];
-      this.eventFeed.push(`${fc.short} baut Gebäude (L${this.villageManager.villages[faction]?.level ?? 1})`, fc.color === 0x5ec8ff ? '#5ec8ff' : '#ff5d63');
+      const fc  = FACTIONS[faction];
+      const css = '#' + fc.color.toString(16).padStart(6, '0');
+      this.eventFeed.push(`${fc.short} baut Gebäude (L${this.villageManager.villages[faction]?.level ?? 1})`, css);
     };
     this.villageManager.onBuildingDestroyed = () => {
       this.diplomacy.addTension(12);
       this.worldRenderer.drawAll();
       this.buildingRenderer.drawAll(this.villageManager.liveBuildings);
-      this.eventFeed.push('Gebäude zerstört!', '#ff9944');
+      this.eventFeed.push('Ein Gebäude wurde zerstört!', '#ff9944');
     };
-    this.diplomacy.onStateChange = () => {
+    this.diplomacy.onStateChange = (state: DiplomaticState) => {
       const ui = this.scene.get('UIScene') as UIScene | null;
       ui?.setStatus(this.diplomacy.statusText);
-      const colorMap: Record<string, string> = {
-        peace: '#77d7ff', tension: '#ffca45', war: '#ff4b4b', truce: '#aaffaa',
+      // Zustandsspezifische Nachrichten für den EventFeed (Phase 13E)
+      const msgMap: Record<DiplomaticState, string> = {
+        tension: '⚔ Spannung steigt an der Grenze',
+        war:     '🔴 KRIEG — Feinde greifen an!',
+        truce:   '🤝 Waffenstillstand vereinbart',
+        peace:   '☮ Frieden kehrt zurück',
       };
-      this.eventFeed.push(`Status: ${this.diplomacy.statusText}`, colorMap[this.diplomacy.state]);
+      const colorMap: Record<DiplomaticState, string> = {
+        tension: '#ffca45',
+        war:     '#ff4b4b',
+        truce:   '#aaffaa',
+        peace:   '#77d7ff',
+      };
+      this.eventFeed.push(msgMap[state], colorMap[state]);
     };
 
     // 7. Kamera
@@ -150,7 +207,26 @@ export class GameScene extends Phaser.Scene {
     this.unitRenderer = new UnitRenderer(unitG);
     this.unitRenderer.drawAll(this.unitManager.liveUnits);
 
+    const creatureG    = this.add.graphics();
+    this.creatureRenderer = new CreatureRenderer(creatureG);
+    this.creatureRenderer.drawAll(this.creatureManager.liveCreatures);
+
     this.effectSystem = new EffectSystem(effectsG);
+
+    // Treffer-Funken: CombatSystem → EffectSystem verdrahten (Phase 13E)
+    this.unitManager.getAI().combat.onHit = (px: number, py: number) => {
+      this.effectSystem.spawnHitSpark(px, py);
+    };
+
+    // Kreatur-Callbacks: Treffer-Funken + EventFeed bei Tod
+    this.creatureManager.onHit = (px: number, py: number) => {
+      this.effectSystem.spawnHitSpark(px, py);
+    };
+    this.creatureManager.onDeath = (type) => {
+      const label = type === 'wolf' ? '🐺 Wolf besiegt' : '👿 Dämon vernichtet!';
+      const color = type === 'wolf' ? '#aaaaaa' : '#ff6600';
+      this.eventFeed.push(label, color);
+    };
 
     // 9. Tool-Controller
     this.toolController = new ToolController(
@@ -163,6 +239,8 @@ export class GameScene extends Phaser.Scene {
       this.buildingRenderer,
       this.unitRenderer,
       this.eventFeed,
+      this.creatureManager,
+      this.creatureRenderer,
     );
     // Kamera-Oberkante für Blitz-/Meteor-Startpunkt
     this.toolController.getCamTop = () => {
@@ -175,14 +253,43 @@ export class GameScene extends Phaser.Scene {
     this.cameraController = new CameraController(this, this.cameras.main);
     this.setupTapHandling();
 
-    // 11. UI starten und Intro-Overlay verdrahten sobald UIScene bereit ist
+    // 11. In-Game-HUD starten (UIScene verwaltet nur die In-Game-UI)
     this.scene.launch('UIScene');
 
-    // UIScene ist async — warten bis 'create' der UIScene abgeschlossen ist
+    // EventFeed: Startnachricht je nach Spielmodus ausgeben sobald UIScene bereit ist
     this.scene.get('UIScene').events.once(Phaser.Scenes.Events.CREATE, () => {
-      const ui = this.scene.get('UIScene') as UIScene | null;
-      ui?.setupIntroOverlay(this.clock, this.eventFeed);
+      if (restoreSave) {
+        this.eventFeed.push('Spielstand geladen.', '#aaffaa');
+      } else {
+        this.eventFeed.push('Eine neue Welt erwacht.', '#77d7ff');
+      }
+      if (cfg.gameMode === 'scenario' && cfg.scenarioId) {
+        const scn = SCENARIOS[cfg.scenarioId];
+        this.eventFeed.push(`${scn.icon} Szenario: ${scn.title}`, '#ffdd88');
+      } else if (cfg.gameMode === 'scenario') {
+        this.eventFeed.push('Ziel: 30 Tage überleben.', '#aaffaa');
+      } else {
+        this.eventFeed.push('Sandbox-Modus — keine Zeitbegrenzung.', '#9fb3c8');
+      }
     });
+
+    // Szenario-Start-Events: besondere Startzustände je nach Szenario
+    if (!restoreSave && cfg.gameMode === 'scenario' && cfg.scenarioId === 'stopWildfire') {
+      // Wildfeuer-Szenario: mehrere Feuer im Wald entzünden
+      const cols = this.grid.cols;
+      const rows = this.grid.rows;
+      for (let attempt = 0; attempt < 20; attempt++) {
+        const fx = Math.floor(cols * 0.2 + Math.random() * cols * 0.6);
+        const fy = Math.floor(rows * 0.2 + Math.random() * rows * 0.6);
+        this.fireSystem.ignite(fx, fy);
+      }
+      this.worldRenderer.drawAll();
+    }
+
+    // Spielstand wiederherstellen wenn ein Restore-Payload vorhanden ist
+    if (restoreSave) {
+      this.restoreFromSave(restoreSave);
+    }
   }
 
   private setupCamera(): void {
@@ -325,14 +432,57 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
+    // ─── Kreatur-Interpolation ─────────────────────────────────────────────
+    {
+      const maxStep = VISUAL_SPEED_PX_PER_MS * delta;
+      let anyMoving = false;
+      for (const c of this.creatureManager.liveCreatures) {
+        const targetX = c.x * TILE + TILE / 2;
+        const targetY = c.y * TILE + TILE / 2;
+        const dx = targetX - c.visualX;
+        const dy = targetY - c.visualY;
+        const distPx = Math.hypot(dx, dy);
+        if (distPx > 0.5) {
+          anyMoving = true;
+          if (distPx <= maxStep) {
+            c.visualX = targetX;
+            c.visualY = targetY;
+          } else {
+            const ratio = maxStep / distPx;
+            c.visualX += dx * ratio;
+            c.visualY += dy * ratio;
+          }
+        }
+      }
+      if (anyMoving) {
+        this.creatureRenderer.drawAll(this.creatureManager.liveCreatures);
+      }
+    }
+
+    // ─── Gebäude-Treffer-Flash-Timer herunterzählen (Phase 13E) ───────────────
+    {
+      let needBuildingRedraw = false;
+      for (const b of this.villageManager.buildings) {
+        if (b.hitFlash > 0) {
+          b.hitFlash = Math.max(0, b.hitFlash - delta);
+          needBuildingRedraw = true;
+        }
+      }
+      if (needBuildingRedraw) {
+        this.buildingRenderer.drawAll(this.villageManager.liveBuildings);
+      }
+    }
+
     // AI + Hunger
     if (this.aiAccum >= this.AI_INTERVAL_MS) {
       this.aiAccum = 0;
       this.clock.tick();
       this.unitManager.tick(1);
       this.hungerSystem.tick(1);
-      // Einheitenpositionen haben sich geändert — sofort neu zeichnen
+      this.creatureManager.tick(this.unitManager.liveUnits);
+      // Positionen haben sich geändert — neu zeichnen
       this.unitRenderer.drawAll(this.unitManager.liveUnits);
+      this.creatureRenderer.drawAll(this.creatureManager.liveCreatures);
       this.inspectPanel.refresh();
       this.eventFeed.update();
       this.pushHudUpdate();
@@ -345,6 +495,8 @@ export class GameScene extends Phaser.Scene {
       this.diplomacy.tick();
       this.unitManager.setWarState(this.diplomacy.isWar);
       this.pushHudUpdate();
+      // Autosave bei jedem Dorf-Tick (~650 ms Spielzeit)
+      this.saveGame();
     }
   }
 
@@ -352,19 +504,200 @@ export class GameScene extends Phaser.Scene {
     const ui = this.scene.get('UIScene') as UIScene | null;
     if (!ui) return;
 
-    const h = this.villageManager.villages.human;
-    const o = this.villageManager.villages.orc;
-
-    // GoalSystem-Tag für HUD verwenden (zeigt Fortschritt zum Ziel)
-    ui.setDay(this.goalSystem.day);
+    // GoalSystem-Tag für HUD verwenden — im Szenario-Modus mit Zielanzeige
+    if (this.goalSystem.mode === 'scenario') {
+      ui.setDay(this.goalSystem.day, 30);
+    } else {
+      ui.setDay(this.goalSystem.day);
+    }
     ui.setStatus(this.diplomacy.statusText);
 
-    ui.setHumanSummary(
-      h ? `${this.unitManager.liveCount('human')}  F${Math.floor(h.food)}  W${Math.floor(h.wood)}  L${h.level}` : '—',
-    );
-    ui.setOrcSummary(
-      o ? `${this.unitManager.liveCount('orc')}  F${Math.floor(o.food)}  W${Math.floor(o.wood)}  L${o.level}` : '—',
-    );
+    // Alle Fraktionen dynamisch — zeigt '—' wenn Fraktion nicht aktiv
+    for (const faction of FACTION_KEYS) {
+      const v = this.villageManager.villages[faction];
+      ui.setFactionSummary(
+        faction,
+        v
+          ? `${this.unitManager.liveCount(faction)} F${Math.floor(v.food)} W${Math.floor(v.wood)} L${v.level}`
+          : '—',
+      );
+    }
+  }
+
+  // ─── Speichern / Laden ───────────────────────────────────────────────────
+
+  /** Baut SaveGame aus aktuellem Spielzustand und schreibt in localStorage. */
+  saveGame(): void {
+    const data: SaveGame = {
+      version:  SAVE_VERSION,
+      savedAt:  Date.now(),
+      config:   this.worldConfig,
+      world: {
+        cols:  this.grid.cols,
+        rows:  this.grid.rows,
+        tiles: Array.from(this.grid.tiles),
+        meta:  this.grid.meta.map(m => ({
+          variant: m.variant,
+          burn:    m.burn,
+          wet:     m.wet,
+          decor:   m.decor,
+        })),
+      },
+      villages: Object.values(this.villageManager.villages)
+        .filter((v): v is Village => v !== undefined)
+        .map(v => ({
+          faction:   v.faction,
+          x:         v.x,
+          y:         v.y,
+          food:      v.food,
+          wood:      v.wood,
+          level:     v.level,
+          expansion: v.expansion,
+          hunger:    v.hunger,
+          territory: v.territory,
+        })),
+      buildings: this.villageManager.buildings.map(b => ({
+        id:      b.id,
+        faction: b.faction,
+        type:    b.type,
+        x:       b.x,
+        y:       b.y,
+        hp:      b.hp,
+        dead:    b.dead,
+      })),
+      units: this.unitManager.units.map(u => ({
+        id:        u.id,
+        faction:   u.faction,
+        role:      u.role,
+        x:         u.x,
+        y:         u.y,
+        hp:        u.hp,
+        maxHp:     u.maxHp,
+        state:     u.state,
+        carryFood: u.carryFood,
+        carryWood: u.carryWood,
+        cd:        u.cd,
+        dead:      u.dead,
+      })),
+      diplomacy: {
+        state:      this.diplomacy.state,
+        tension:    this.diplomacy.tension,
+        truceTicks: this.diplomacy.truceTicks,
+      },
+      goal: {
+        day:       this.goalSystem.day,
+        mode:      this.goalSystem.mode,
+        goalState: this.goalSystem.state,
+      },
+      clock: {
+        speedIndex: this.clock.speedIndex0,
+        paused:     this.clock.paused,
+      },
+    };
+    SaveSystem.save(data);
+  }
+
+  /**
+   * Stellt den Spielzustand aus einem SaveGame-Objekt wieder her.
+   * Wird nach dem normalen create()-Durchlauf aufgerufen.
+   */
+  restoreFromSave(save: SaveGame): void {
+    // ── Weltgitter: Kacheln und Metadaten überschreiben ──────────────────────
+    for (let i = 0; i < save.world.tiles.length; i++) {
+      this.grid.tiles[i] = save.world.tiles[i] as TileType;
+    }
+    for (let i = 0; i < save.world.meta.length; i++) {
+      const m = save.world.meta[i];
+      if (m) {
+        this.grid.meta[i].variant = m.variant;
+        this.grid.meta[i].burn    = m.burn;
+        this.grid.meta[i].wet     = m.wet;
+        this.grid.meta[i].decor   = m.decor;
+      }
+    }
+
+    // ── Dorf-Felder wiederherstellen ─────────────────────────────────────────
+    for (const sv of save.villages) {
+      const v = this.villageManager.villages[sv.faction as FactionKey];
+      if (!v) continue;
+      v.food      = sv.food;
+      v.wood      = sv.wood;
+      v.level     = sv.level;
+      v.expansion = sv.expansion;
+      v.hunger    = sv.hunger;
+      v.territory = sv.territory;
+    }
+
+    // ── Gebäude wiederherstellen ─────────────────────────────────────────────
+    // Vorhandene Arrays leeren
+    this.villageManager.buildings.length = 0;
+    for (const v of this.villageManager.allVillages) {
+      v.buildings.length = 0;
+    }
+
+    for (const sb of save.buildings) {
+      const b = new Building(
+        sb.faction as FactionKey,
+        sb.type    as BuildingType,
+        sb.x,
+        sb.y,
+      );
+      b.hp   = sb.hp;
+      b.dead = sb.dead;
+      this.villageManager.buildings.push(b);
+      if (!sb.dead) {
+        this.villageManager.villages[sb.faction as FactionKey]?.buildings.push(b);
+      }
+    }
+
+    // ── Einheiten wiederherstellen ───────────────────────────────────────────
+    // Vorhandenes Array leeren
+    this.unitManager.units.length = 0;
+
+    for (const su of save.units) {
+      const u = new Unit(
+        su.faction as FactionKey,
+        su.role    as UnitRole,
+        su.x,
+        su.y,
+      );
+      u.hp        = su.hp;
+      u.maxHp     = su.maxHp;
+      u.state     = su.state    as UnitState;
+      u.carryFood = su.carryFood;
+      u.carryWood = su.carryWood;
+      u.cd        = su.cd;
+      u.dead      = su.dead;
+      this.unitManager.units.push(u);
+    }
+
+    // ── Diplomatie wiederherstellen ──────────────────────────────────────────
+    this.diplomacy.state      = save.diplomacy.state      as typeof this.diplomacy.state;
+    this.diplomacy.tension    = save.diplomacy.tension;
+    this.diplomacy.truceTicks = save.diplomacy.truceTicks;
+
+    // ── Ziel-System wiederherstellen ─────────────────────────────────────────
+    this.goalSystem.setDay(save.goal.day);
+    this.goalSystem.mode = save.goal.mode as typeof this.goalSystem.mode;
+    this.goalSystem.setState(save.goal.goalState as GoalState);
+
+    // ── Uhr wiederherstellen ─────────────────────────────────────────────────
+    this.clock.setSpeed(save.clock.speedIndex as SpeedIndex);
+    if (save.clock.paused && !this.clock.paused) {
+      this.clock.togglePause();
+    } else if (!save.clock.paused && this.clock.paused) {
+      this.clock.togglePause();
+    }
+
+    // ── Renderer neu zeichnen ────────────────────────────────────────────────
+    this.worldRenderer.drawAll();
+    this.buildingRenderer.drawAll(this.villageManager.liveBuildings);
+    this.unitRenderer.drawAll(this.unitManager.liveUnits);
+  }
+
+  /** Gibt zurück ob ein Spielstand im localStorage existiert. */
+  static hasSave(): boolean {
+    return SaveSystem.hasSave();
   }
 
   // ─── Öffentliche API ─────────────────────────────────────────────────────

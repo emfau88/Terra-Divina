@@ -1,5 +1,11 @@
 /**
- * ToolController — Phase VFX
+ * ToolController — Phase 17 (Terrain-Painting)
+ *
+ * Neu in Phase 17:
+ *   - useTerrain(): setzt Kachel-Typ direkt im Grid und zeichnet Welt neu
+ *   - Terrain-Cases im switch: terrain-grass, terrain-water, terrain-forest,
+ *     terrain-mountain, terrain-sand
+ *   - Wasser-Terrain löscht automatisch Feuer auf der Zielkachel
  *
  * Verbindet Tool-Aktivierung mit Simulation (GodTools) und VFX (EffectSystem).
  * Trennung klar:
@@ -8,16 +14,20 @@
  *   - Renderer     → Nach Zustandsänderung neu zeichnen
  */
 
-import { WorldGrid }      from '@game/world/WorldGrid';
-import { VillageManager } from '@game/factions/VillageManager';
-import { UnitManager }    from '@game/units/UnitManager';
-import { FireSystem }     from '@game/simulation/FireSystem';
-import { EffectSystem }   from '@game/effects/EffectSystem';
-import { WorldRenderer }  from '@game/rendering/WorldRenderer';
+import { WorldGrid }        from '@game/world/WorldGrid';
+import { TileType }         from '@game/world/TileTypes';
+import { VillageManager }   from '@game/factions/VillageManager';
+import { UnitManager }      from '@game/units/UnitManager';
+import { FactionKey }       from '@game/factions/Faction';
+import { FireSystem }       from '@game/simulation/FireSystem';
+import { EffectSystem }     from '@game/effects/EffectSystem';
+import { WorldRenderer }    from '@game/rendering/WorldRenderer';
 import { BuildingRenderer } from '@game/rendering/BuildingRenderer';
-import { UnitRenderer }   from '@game/rendering/UnitRenderer';
-import { EventFeed }      from '@game/ui/EventFeed';
-import { TILE }           from '@game/config';
+import { UnitRenderer }     from '@game/rendering/UnitRenderer';
+import { CreatureManager }  from '@game/creatures/CreatureManager';
+import { CreatureRenderer } from '@game/rendering/CreatureRenderer';
+import { EventFeed }        from '@game/ui/EventFeed';
+import { TILE }             from '@game/config';
 import {
   applyLightning,
   applyFire,
@@ -40,6 +50,8 @@ export class ToolController {
   private readonly worldRenderer:    WorldRenderer;
   private readonly buildingRenderer: BuildingRenderer;
   private readonly unitRenderer:     UnitRenderer;
+  private readonly creatureManager:  CreatureManager;
+  private readonly creatureRenderer: CreatureRenderer;
 
   /** Kamera-Oberkante in Weltpixeln — für Blitz-Start-Y. */
   getCamTop: () => number = () => 0;
@@ -54,6 +66,8 @@ export class ToolController {
     buildingRenderer: BuildingRenderer,
     unitRenderer:     UnitRenderer,
     feed:             EventFeed,
+    creatureManager:  CreatureManager,
+    creatureRenderer: CreatureRenderer,
   ) {
     this.grid             = grid;
     this.villages         = villages;
@@ -64,20 +78,32 @@ export class ToolController {
     this.worldRenderer    = worldRenderer;
     this.buildingRenderer = buildingRenderer;
     this.unitRenderer     = unitRenderer;
+    this.creatureManager  = creatureManager;
+    this.creatureRenderer = creatureRenderer;
   }
 
   // ─── Haupt-Dispatch ───────────────────────────────────────────────────────
 
   use(tool: string, tx: number, ty: number): ToolResult {
     switch (tool) {
-      case 'lightning': return this.useLightning(tx, ty);
-      case 'fire':      return this.useFire(tx, ty);
-      case 'rain':      return this.useRain(tx, ty);
-      case 'meteor':    return this.useMeteor(tx, ty);
-      case 'heal':      return this.useHeal(tx, ty);
-      case 'human':     return this.useSpawn(tx, ty, 'human');
-      case 'orc':       return this.useSpawn(tx, ty, 'orc');
-      default:          return 'no-target';
+      case 'lightning':        return this.useLightning(tx, ty);
+      case 'fire':             return this.useFire(tx, ty);
+      case 'rain':             return this.useRain(tx, ty);
+      case 'meteor':           return this.useMeteor(tx, ty);
+      case 'heal':             return this.useHeal(tx, ty);
+      case 'human':            return this.useSpawn(tx, ty, 'human');
+      case 'orc':              return this.useSpawn(tx, ty, 'orc');
+      case 'elf':              return this.useSpawn(tx, ty, 'elf');
+      case 'dwarf':            return this.useSpawn(tx, ty, 'dwarf');
+      case 'wolf':             return this.useSpawnCreature(tx, ty, 'wolf');
+      case 'demon':            return this.useSpawnCreature(tx, ty, 'demon');
+      // ─── Terrain-Werkzeuge ─────────────────────────────────────────────────
+      case 'terrain-grass':    return this.useTerrain(tx, ty, TileType.Grass);
+      case 'terrain-water':    return this.useTerrain(tx, ty, TileType.Water);
+      case 'terrain-forest':   return this.useTerrain(tx, ty, TileType.Forest);
+      case 'terrain-mountain': return this.useTerrain(tx, ty, TileType.Mountain);
+      case 'terrain-sand':     return this.useTerrain(tx, ty, TileType.Sand);
+      default:                 return 'no-target';
     }
   }
 
@@ -180,7 +206,7 @@ export class ToolController {
     return 'ok';
   }
 
-  private useSpawn(tx: number, ty: number, faction: 'human' | 'orc'): ToolResult {
+  private useSpawn(tx: number, ty: number, faction: FactionKey): ToolResult {
     const ok = applySpawnUnit(tx, ty, faction, this.grid, this.units);
     if (!ok) return 'cap-reached';
 
@@ -194,5 +220,58 @@ export class ToolController {
 
     this.unitRenderer.drawAll(this.units.liveUnits);
     return 'ok';
+  }
+
+  private useSpawnCreature(tx: number, ty: number, type: 'wolf' | 'demon'): ToolResult {
+    if (!this.grid.isWalkable(tx, ty)) return 'no-target';
+
+    this.creatureManager.spawn(type, tx, ty);
+
+    // VFX — kleiner Spawn-Ring
+    const px = tx * TILE + TILE / 2;
+    const py = ty * TILE + TILE / 2;
+    this.effects.spawnSpawnEffect(px, py, 2 * TILE);
+
+    // EventFeed-Meldung
+    const label = type === 'wolf' ? '🐺 Wolf erscheint' : '👿 Dämon erscheint!';
+    const color = type === 'wolf' ? '#aaaaaa' : '#ff4444';
+    this.feed.push(label, color);
+
+    this.creatureRenderer.drawAll(this.creatureManager.liveCreatures);
+    return 'ok';
+  }
+
+  // ─── Terrain-Malwerkzeug ─────────────────────────────────────────────────
+
+  /**
+   * Setzt den Kachel-Typ an (tx, ty) direkt und zeichnet die Welt neu.
+   * Wasser-Terrain löscht zusätzlich Feuer auf der Zielkachel (Radius 0).
+   */
+  private useTerrain(tx: number, ty: number, type: TileType): ToolResult {
+    if (!this.grid.inBounds(tx, ty)) return 'no-target';
+
+    // Wasser löscht Feuer auf dem Tile
+    if (type === TileType.Water) {
+      this.fire.extinguishRadius(tx, ty, 0);
+    }
+
+    this.grid.set(tx, ty, type);
+    this.worldRenderer.drawAll();
+    this.feed.push(`🌍 Terrain geändert: ${this.terrainLabel(type)}`, '#9fb3c8');
+    return 'ok';
+  }
+
+  /**
+   * Gibt den deutschen Anzeigenamen für einen Kachel-Typ zurück.
+   */
+  private terrainLabel(type: TileType): string {
+    const map: Partial<Record<TileType, string>> = {
+      [TileType.Grass]:    'Gras',
+      [TileType.Water]:    'Wasser',
+      [TileType.Forest]:   'Wald',
+      [TileType.Mountain]: 'Berg',
+      [TileType.Sand]:     'Sand',
+    };
+    return map[type] ?? 'Unbekannt';
   }
 }

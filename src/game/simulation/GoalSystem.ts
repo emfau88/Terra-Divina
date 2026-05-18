@@ -1,30 +1,42 @@
 /**
- * GoalSystem — Phase 13A
+ * GoalSystem — Phase 20
  *
- * Verfolgt das 30-Tage-Überlebensziel der Welt.
- * Unabhängig von Phaser; wird von GameScene orchestriert.
+ * Verfolgt Sieg/Niederlage-Bedingungen für Sandbox + Szenarien.
+ *
+ * Szenario-Bedingungen:
+ *   survive_days:    Mindestens ein Dorf überlebt N Tage
+ *   no_fire_by_day:  Kein Feuer aktiv nach Tag N
+ *   no_war_by_day:   Kein Krieg vor Tag N
+ *   faction_survives: Bestimmte Fraktion überlebt N Tage
  */
 
-import { VillageManager } from '@game/factions/VillageManager';
-import { UnitManager }    from '@game/units/UnitManager';
+import { VillageManager }   from '@game/factions/VillageManager';
+import { UnitManager }      from '@game/units/UnitManager';
+import { FireSystem }       from '@game/simulation/FireSystem';
+import { DiplomacySystem }  from '@game/simulation/DiplomacySystem';
+import { ScenarioGoalDef }  from '@game/simulation/ScenarioDefinition';
 
-/** Zielanzahl an Tagen, die die Welt überleben muss. */
+/** Zielanzahl an Tagen — Standard für survive30-Szenario. */
 export const GOAL_DAYS = 30;
 
 /** Mögliche Ziel-Zustände. */
 export type GoalState = 'playing' | 'won' | 'lost';
 
 export class GoalSystem {
-  /** Aktueller Spielzustand. */
   private _state: GoalState = 'playing';
-
-  /** Aktueller Tageszähler. */
   private _day = 1;
 
-  /**
-   * Callback, der aufgerufen wird, wenn sich der Zustand ändert.
-   * Wird von GameScene gesetzt.
-   */
+  /** Spielmodus. */
+  mode: 'sandbox' | 'scenario' = 'scenario';
+
+  /** Szenario-Ziel-Definition (wird von GameScene gesetzt). */
+  scenarioGoal: ScenarioGoalDef | null = null;
+
+  /** Externe Systeme die GoalSystem für Fire/Diplomacy-Checks braucht. */
+  fireSystem:   FireSystem | null       = null;
+  diplomacy:    DiplomacySystem | null  = null;
+
+  /** Callback, der aufgerufen wird, wenn sich der Zustand ändert. */
   onGoalChange: ((state: 'won' | 'lost') => void) | null = null;
 
   // ─── Getter ──────────────────────────────────────────────────────────────
@@ -32,18 +44,19 @@ export class GoalSystem {
   get state(): GoalState { return this._state; }
   get day(): number      { return this._day; }
 
+  setDay(n: number): void { this._day = n; }
+  setState(s: GoalState): void { this._state = s; }
+
   // ─── Tag hinzufügen ──────────────────────────────────────────────────────
 
-  /**
-   * Erhöht den Tageszähler um 1 und prüft anschließend Sieg/Niederlage.
-   * Hat keinen Effekt, wenn das Spiel bereits entschieden ist.
-   */
   addDay(villages: VillageManager, units: UnitManager): void {
     if (this._state !== 'playing') return;
 
     this._day++;
 
-    if (this.checkWin(villages)) {
+    if (this.mode !== 'scenario') return;
+
+    if (this.checkWin(villages, units)) {
       this._state = 'won';
       this.onGoalChange?.('won');
       return;
@@ -55,25 +68,72 @@ export class GoalSystem {
     }
   }
 
-  // ─── Siegbedingung ───────────────────────────────────────────────────────
+  // ─── Sieg-Bedingung ──────────────────────────────────────────────────────
 
-  /**
-   * Sieg: 30 Tage erreicht UND mindestens ein Dorf hat noch Gebäude.
-   */
-  checkWin(villages: VillageManager): boolean {
-    if (this._day < GOAL_DAYS) return false;
-    return villages.allVillages.some(v => v.buildings.length > 0);
+  checkWin(villages: VillageManager, units: UnitManager): boolean {
+    const goal      = this.scenarioGoal;
+    const targetDay = goal?.targetDay ?? GOAL_DAYS;
+
+    if (this._day < targetDay) return false;
+
+    if (!goal) {
+      // Default: mindestens ein Dorf hat noch Gebäude
+      return villages.allVillages.some(v => v.buildings.length > 0);
+    }
+
+    switch (goal.condition) {
+      case 'survive_days':
+        return villages.allVillages.some(v => v.buildings.length > 0);
+
+      case 'no_fire_by_day':
+        // Sieg: Tag erreicht UND kein Feuer aktiv UND mindestens ein Dorf lebt
+        return (
+          !(this.fireSystem?.hasFire ?? false) &&
+          villages.allVillages.some(v => v.buildings.length > 0)
+        );
+
+      case 'no_war_by_day':
+        // Win: Tag erreicht ohne Krieg (Zustand jetzt peace/truce)
+        return this.diplomacy?.state !== 'war';
+
+      case 'faction_survives': {
+        if (!goal.factionKey) return false;
+        const fv = villages.villages[goal.factionKey];
+        return fv !== undefined && fv.buildings.length > 0 && units.liveCount(goal.factionKey) > 0;
+      }
+    }
   }
 
   // ─── Niederlage-Bedingung ────────────────────────────────────────────────
 
-  /**
-   * Niederlage: alle Dörfer haben keine Gebäude mehr UND
-   * es gibt keine lebenden Einheiten.
-   */
   checkLose(villages: VillageManager, units: UnitManager): boolean {
-    const allEmpty = villages.allVillages.every(v => v.buildings.length === 0);
+    const goal = this.scenarioGoal;
+
+    // Generelle Niederlage: alle Dörfer tot
+    const allDead = villages.allVillages.every(v => v.buildings.length === 0);
     const noneAlive = units.liveUnits.length === 0;
-    return allEmpty && noneAlive;
+
+    if (!goal) return allDead && noneAlive;
+
+    switch (goal.condition) {
+      case 'survive_days':
+        return allDead && noneAlive;
+
+      case 'no_fire_by_day':
+        // Niederlage: zu viele Gebäude vernichtet (> 60% der Ausgangspopulation verloren)
+        // Oder alle Dörfer tot
+        return allDead && noneAlive;
+
+      case 'no_war_by_day':
+        // Niederlage: Krieg ausgebrochen
+        return this.diplomacy?.state === 'war';
+
+      case 'faction_survives': {
+        if (!goal.factionKey) return false;
+        const fv = villages.villages[goal.factionKey];
+        // Niederlage: Fraktion hat keine Gebäude mehr und keine Einheiten
+        return (fv === undefined || fv.buildings.length === 0) && units.liveCount(goal.factionKey) === 0;
+      }
+    }
   }
 }

@@ -129,6 +129,24 @@ export class EffectSystem {
     }
   }
 
+  /** Kleine Treffer-Funken beim Einheit-vs-Einheit-Kampf (Phase 13E). */
+  spawnHitSpark(px: number, py: number): void {
+    // 3 kurze Funken in zufälliger Richtung mit roter/orange-roter Farbe
+    for (let i = 0; i < 3; i++) {
+      const angle    = Math.random() * Math.PI * 2;
+      const speed    = rnd(40, 80) / 60;  // px pro Frame (60 fps Basis)
+      const color    = i % 2 === 0 ? 0xff4444 : 0xff8844;
+      const duration = randi(180, 250);
+      this.effects.push({
+        id: newEffectId(), type: 'spark',
+        px, py, age: 0, duration,
+        color,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 0.3,  // leichter Auftrieb nach oben
+      } as SparkEffect);
+    }
+  }
+
   spawnImpactRing(px: number, py: number, color: number, maxR: number): void {
     this.effects.push({
       id: newEffectId(), type: 'ring',

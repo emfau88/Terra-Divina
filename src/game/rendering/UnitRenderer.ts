@@ -62,9 +62,9 @@ export class UnitRenderer {
         g.strokeCircle(px, py, 7.2);
         break;
       case 'raider':
-        // Schwarzes Dreieck oben = Angriffsspitze
-        g.fillStyle(0x111111, 0.9);
-        g.fillTriangle(px - 3, py - 8, px + 3, py - 8, px, py - 12);
+        // Rot-oranges Dreieck oben = gut sichtbare Angriffsspitze (Phase 13E)
+        g.fillStyle(0xff6633, 1.0);
+        g.fillTriangle(px - 4, py - 8, px + 4, py - 8, px, py - 14);
         break;
       case 'builder':
         // Kleines gelbes Quadrat = Werkzeug

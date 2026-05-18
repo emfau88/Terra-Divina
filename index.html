@@ -18,14 +18,97 @@
 
   <script type="module" src="/src/main.ts"></script>
 
-  <!-- Intro-Overlay: wird beim Start angezeigt, Uhr startet erst nach Klick -->
-  <div id="intro-overlay">
-    <div id="intro-box">
-      <h1>Terra Divina</h1>
-      <p class="intro-sub">Eine kleine lebendige Welt erwacht.</p>
-      <div class="intro-goal"><strong>Ziel:</strong> Hilf der Welt, 30 Tage zu überleben.</div>
-      <p class="intro-hint">Setze deine Gotteskräfte weise ein. Feuer, Krieg, Hunger und Katastrophen können ein Dorf schnell auslöschen.</p>
-      <button id="btn-start-world">Welt starten</button>
+  <!-- Hauptmenü: wird beim Start angezeigt, Uhr startet erst nach Modusauswahl -->
+  <div id="main-menu">
+    <div id="menu-box">
+      <div id="menu-title">Terra Divina</div>
+      <div id="menu-subtitle">Eine lebendige Welt erwartet dich.</div>
+      <div class="menu-buttons">
+        <button class="menu-btn menu-btn--disabled" id="btn-continue" disabled>
+          <span class="menu-btn-icon">📖</span>
+          <span class="menu-btn-label">Fortsetzen</span>
+          <span class="menu-btn-sub">Kein Spielstand vorhanden</span>
+        </button>
+        <button class="menu-btn menu-btn--primary" id="btn-new-world">
+          <span class="menu-btn-icon">🌍</span>
+          <span class="menu-btn-label">Neue Welt</span>
+          <span class="menu-btn-sub">Freies Sandbox-Spiel</span>
+        </button>
+        <button class="menu-btn" id="btn-scenario">
+          <span class="menu-btn-icon">⚔</span>
+          <span class="menu-btn-label">Szenario: 30 Tage</span>
+          <span class="menu-btn-sub">Hilf der Welt zu überleben</span>
+        </button>
+        <button class="menu-btn menu-btn--secondary" id="btn-options">
+          <span class="menu-btn-icon">⚙</span>
+          <span class="menu-btn-label">Optionen</span>
+          <span class="menu-btn-sub"></span>
+        </button>
+      </div>
+      <div id="setup-panel" class="hidden">
+        <div class="setup-section">
+          <div class="setup-label">Weltgröße</div>
+          <div class="setup-row" id="setup-size">
+            <button class="setup-btn active" data-value="medium">Mittel</button>
+            <button class="setup-btn" data-value="small">Klein</button>
+          </div>
+        </div>
+        <div class="setup-section">
+          <div class="setup-label">Welttyp</div>
+          <div class="setup-row" id="setup-type">
+            <button class="setup-btn active" data-value="island">Insel</button>
+            <button class="setup-btn" data-value="archipelago">Archipel</button>
+            <button class="setup-btn" data-value="forest">Wald</button>
+            <button class="setup-btn" data-value="mountain">Berge</button>
+          </div>
+        </div>
+        <div class="setup-section">
+          <div class="setup-label">Startmodus</div>
+          <div class="setup-row" id="setup-mode">
+            <button class="setup-btn" data-value="peaceful">Friedlich</button>
+            <button class="setup-btn active" data-value="balanced">Ausgeglichen</button>
+            <button class="setup-btn" data-value="warTorn">Kriegslust</button>
+            <button class="setup-btn" data-value="chaos">Chaos</button>
+          </div>
+        </div>
+        <div class="setup-section">
+          <div class="setup-label">Völker</div>
+          <div class="setup-row setup-row--factions" id="setup-factions">
+            <button class="setup-btn setup-btn--faction active" data-faction="human" style="color:#5ec8ff">Menschen</button>
+            <button class="setup-btn setup-btn--faction active" data-faction="orc"   style="color:#ff5d63">Orks</button>
+            <button class="setup-btn setup-btn--faction active" data-faction="elf"   style="color:#6dff8a">Elfen</button>
+            <button class="setup-btn setup-btn--faction active" data-faction="dwarf" style="color:#d4a04a">Zwerge</button>
+          </div>
+        </div>
+        <div class="setup-section setup-seed-row">
+          <div class="setup-label">Seed</div>
+          <div class="setup-seed-value" id="setup-seed-display">123456</div>
+          <button class="setup-btn" id="btn-reseed">🔀</button>
+        </div>
+        <button class="menu-btn menu-btn--primary" id="btn-start-game" style="margin-top:8px">
+          <span class="menu-btn-icon">▶</span>
+          <span class="menu-btn-label">Welt starten</span>
+          <span class="menu-btn-sub"></span>
+        </button>
+      </div>
+      <!-- Szenario-Panel: Liste der wählbaren Szenarien -->
+      <div id="scenario-panel" class="hidden">
+        <div class="setup-label" style="font-size:14px;margin-bottom:8px">Szenario wählen</div>
+        <!-- Wird dynamisch von MainMenuScene befüllt -->
+        <div id="scenario-list"></div>
+        <button class="menu-btn menu-btn--secondary" id="btn-scenario-back" style="margin-top:8px">
+          <span class="menu-btn-icon">←</span>
+          <span class="menu-btn-label">Zurück</span>
+          <span class="menu-btn-sub"></span>
+        </button>
+      </div>
+      <div id="options-panel" class="hidden">
+        <div class="options-row">
+          <span class="options-label">Vollbild</span>
+          <button class="dock-btn" id="btn-menu-fullscreen">Aktivieren</button>
+        </div>
+        <div class="options-version">Terra Divina — v0.15</div>
+      </div>
     </div>
   </div>
 

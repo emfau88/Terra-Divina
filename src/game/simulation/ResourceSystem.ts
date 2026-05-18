@@ -17,6 +17,7 @@ import { UnitManager }     from '@game/units/UnitManager';
 import { WorldGrid }       from '@game/world/WorldGrid';
 import { TileType }        from '@game/world/TileTypes';
 import { FACTION_KEYS, FactionKey } from '@game/factions/Faction';
+import { FACTION_TRAITS }  from '@game/factions/FactionTraits';
 import { Unit }            from '@game/units/Unit';
 import { BALANCE }         from '@game/data/balance';
 import { BuildingType }    from '@game/data/buildingDefs';
@@ -94,6 +95,8 @@ export class ResourceSystem {
     const v = this.villages.villages[faction];
     if (!v) return;
 
+    const traits = FACTION_TRAITS[faction];
+
     // Voll beladen → nach Hause
     if (u.carryFood + u.carryWood >= 3) {
       this.returnHome(u, faction);
@@ -102,18 +105,27 @@ export class ResourceSystem {
 
     const here = this.grid.get(u.x, u.y);
 
-    // Wald → Holz hacken
-    if (here === TileType.Forest && Math.random() < 0.58) {
+    // Wald → Holz hacken (Elfen sammeln mehr, Zwerge weniger)
+    if (here === TileType.Forest && Math.random() < 0.58 * traits.woodGatherMult) {
       u.state = 'chop';
       u.carryWood++;
       if (Math.random() < 0.08) this.grid.set(u.x, u.y, TileType.Grass);
+      // Elfen: passives Heilen im Wald
+      if (traits.forestHealPerTick > 0) {
+        u.hp = Math.min(u.maxHp, u.hp + traits.forestHealPerTick);
+      }
       return;
+    }
+
+    // Im Wald stehend: Elfen heilen auch ohne Holz-Tick
+    if (here === TileType.Forest && traits.forestHealPerTick > 0) {
+      u.hp = Math.min(u.maxHp, u.hp + traits.forestHealPerTick);
     }
 
     // Gras / Sand / Weg → Nahrung sammeln
     if (
       (here === TileType.Grass || here === TileType.Sand || here === TileType.Road)
-      && Math.random() < 0.24
+      && Math.random() < 0.24 * traits.foodGatherMult
     ) {
       u.state = 'forage';
       u.carryFood++;
@@ -176,11 +188,14 @@ export class ResourceSystem {
     const v = this.villages.villages[faction];
     if (!v) return;
 
+    const traits   = FACTION_TRAITS[faction];
+    const spawnCost = Math.round(BALANCE.SPAWN_FOOD_COST * traits.spawnCostMult);
+
     const pop = this.units.liveCount(faction);
     const cap = this.popCap(faction);
-    if (v.food < BALANCE.SPAWN_FOOD_COST || pop >= cap) return;
+    if (v.food < spawnCost || pop >= cap) return;
 
-    v.food -= BALANCE.SPAWN_FOOD_COST;
+    v.food -= spawnCost;
     const u = this.units.spawnUnit(faction);
     if (u) this.onSpawn?.(faction);
   }

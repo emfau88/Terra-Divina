@@ -35,13 +35,32 @@ export class VillageManager {
 
   // ─── Initialisierung ─────────────────────────────────────────────────────
 
-  /** Platziert die zwei Startdörfer (Menschen oben, Orks unten). */
-  placeStartVillages(): void {
-    const hPos = WorldGenerator.findLandNear(this.grid, COLS / 2, ROWS * 0.25, 18);
-    const oPos = WorldGenerator.findLandNear(this.grid, COLS / 2, ROWS * 0.74, 18);
+  /**
+   * Platziert die Startdörfer für alle aktiven Fraktionen.
+   * Ohne factions-Liste: alle vier Fraktionen (human, orc, elf, dwarf).
+   * Mit Liste: nur die genannten Fraktionen.
+   *
+   * Verteilung:
+   * - human: oben-mitte
+   * - orc:   unten-mitte
+   * - elf:   oben-links (Wald-Bereich)
+   * - dwarf: unten-rechts (Berg-Bereich)
+   */
+  placeStartVillages(factions?: FactionKey[]): void {
+    const active = factions ?? (['human', 'orc', 'elf', 'dwarf'] as FactionKey[]);
 
-    this.createVillage('human', hPos.x, hPos.y);
-    this.createVillage('orc',   oPos.x, oPos.y);
+    const positions: Record<FactionKey, { x: number; y: number }> = {
+      human: { x: COLS * 0.5,  y: ROWS * 0.25 },
+      orc:   { x: COLS * 0.5,  y: ROWS * 0.74 },
+      elf:   { x: COLS * 0.25, y: ROWS * 0.35 },
+      dwarf: { x: COLS * 0.75, y: ROWS * 0.65 },
+    };
+
+    for (const faction of active) {
+      const pos = positions[faction];
+      const land = WorldGenerator.findLandNear(this.grid, pos.x, pos.y, 20);
+      this.createVillage(faction, land.x, land.y);
+    }
   }
 
   // ─── Dorf anlegen ────────────────────────────────────────────────────────
@@ -131,14 +150,13 @@ export class VillageManager {
     return this.buildings.find(b => !b.dead && b.x === x && b.y === y);
   }
 
-  /** Mittelpunkt zwischen den beiden Dörfern — für Kamera-Start. */
+  /** Mittelpunkt aller Dörfer — für Kamera-Start. */
   centerPoint(): { x: number; y: number } {
-    const h = this.villages.human;
-    const o = this.villages.orc;
-    if (h && o) return { x: (h.x + o.x) / 2, y: (h.y + o.y) / 2 };
-    if (h)      return { x: h.x, y: h.y };
-    if (o)      return { x: o.x, y: o.y };
-    return { x: COLS / 2, y: ROWS / 2 };
+    const all = this.allVillages;
+    if (all.length === 0) return { x: COLS / 2, y: ROWS / 2 };
+    const sx = all.reduce((s, v) => s + v.x, 0);
+    const sy = all.reduce((s, v) => s + v.y, 0);
+    return { x: sx / all.length, y: sy / all.length };
   }
 
   /** Alle lebenden Gebäude (ohne tote). */

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import '@styles/mobile.css';
 import { CANVAS_W, CANVAS_H } from '@game/config';
 import { BootScene } from '@game/scenes/BootScene';
+import { MainMenuScene } from '@game/scenes/MainMenuScene';
 import { GameScene } from '@game/scenes/GameScene';
 import { UIScene } from '@game/scenes/UIScene';
 
@@ -74,7 +75,7 @@ const config: Phaser.Types.Core.GameConfig = {
   input: {
     activePointers: 3,
   },
-  scene: [BootScene, GameScene, UIScene],
+  scene: [BootScene, MainMenuScene, GameScene, UIScene],
 };
 
 window.addEventListener('load', () => {

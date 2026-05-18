@@ -1,11 +1,11 @@
 /**
- * Faction — Phase 4
+ * Faction — Phase 18
  *
  * Unveränderliche Identitäts- und Farbdaten einer Fraktion.
  * Kein Phaser, kein Rendering.
  */
 
-export type FactionKey = 'human' | 'orc';
+export type FactionKey = 'human' | 'orc' | 'elf' | 'dwarf';
 
 export interface Faction {
   readonly key:          FactionKey;
@@ -36,6 +36,22 @@ export const FACTIONS: Readonly<Record<FactionKey, Faction>> = {
     dark:         0xa22b31,
     villageColor: 0xd34245,
   },
+  elf: {
+    key:          'elf',
+    name:         'Elfen',
+    short:        'ELF',
+    color:        0x6dff8a,
+    dark:         0x1a8a36,
+    villageColor: 0x3dcc60,
+  },
+  dwarf: {
+    key:          'dwarf',
+    name:         'Zwerge',
+    short:        'DWF',
+    color:        0xd4a04a,
+    dark:         0x7a5018,
+    villageColor: 0xb07c28,
+  },
 };
 
-export const FACTION_KEYS: FactionKey[] = ['human', 'orc'];
+export const FACTION_KEYS: FactionKey[] = ['human', 'orc', 'elf', 'dwarf'];

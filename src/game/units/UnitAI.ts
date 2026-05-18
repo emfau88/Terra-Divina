@@ -12,7 +12,8 @@ import { CombatSystem }   from './CombatSystem';
 import { VillageManager } from '@game/factions/VillageManager';
 import { WorldGrid }      from '@game/world/WorldGrid';
 import { TileType }       from '@game/world/TileTypes';
-import { FactionKey }     from '@game/factions/Faction';
+import { FactionKey, FACTION_KEYS } from '@game/factions/Faction';
+import { FACTION_TRAITS } from '@game/factions/FactionTraits';
 
 
 function randi(min: number, max: number): number {
@@ -180,7 +181,8 @@ export class UnitAI {
       return;
     }
 
-    const enemy = this.combat.nearestEnemy(u, allUnits, 6);
+    const aggrRadius = Math.round(6 * FACTION_TRAITS[u.faction].raiderAggrMult);
+    const enemy = this.combat.nearestEnemy(u, allUnits, aggrRadius);
 
     // Nahkampf: feindliche Einheit
     if (enemy && dist(u.x, u.y, enemy.x, enemy.y) <= 1.5) {
@@ -196,7 +198,12 @@ export class UnitAI {
     }
 
     // Kein Feind in Nähe → zum feindlichen Dorf marschieren
-    const enemyFaction: FactionKey = u.faction === 'human' ? 'orc' : 'human';
+    // Wählt eine zufällige feindliche Fraktion, die noch ein Dorf hat
+    const enemyFactions = FACTION_KEYS.filter(
+      k => k !== u.faction && this.villages.villages[k] !== undefined,
+    );
+    if (enemyFactions.length === 0) return;
+    const enemyFaction: FactionKey = enemyFactions[Math.floor(Math.random() * enemyFactions.length)];
     const ev = this.villages.villages[enemyFaction];
     if (!ev) return;
 

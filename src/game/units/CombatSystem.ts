@@ -20,6 +20,9 @@ function dist(ax: number, ay: number, bx: number, by: number): number {
 export class CombatSystem {
   private readonly villages: VillageManager;
 
+  /** Callback der nach jedem Treffer im Einheit-vs-Einheit-Kampf ausgelöst wird (Phase 13E). */
+  onHit: ((px: number, py: number) => void) | null = null;
+
   constructor(villages: VillageManager) {
     this.villages = villages;
   }
@@ -30,6 +33,8 @@ export class CombatSystem {
     if (attacker.cd > 0) return false;
     const dmg = randi(3, 7);
     defender.hp -= dmg;
+    // Treffer-Callback für visuellen Funken-Effekt auslösen (Phase 13E)
+    this.onHit?.(defender.visualX, defender.visualY);
     if (defender.hp <= 0) {
       defender.hp    = 0;
       defender.dead  = true;
@@ -51,6 +56,8 @@ export class CombatSystem {
     const minHp = building.isIndestructible ? 1 : 0;
     const dmg   = randi(2, 5);
     building.hp = Math.max(minHp, building.hp - dmg);
+    // Gebäude-Flash auslösen damit der Renderer eine rote Überlagerung zeigt (Phase 13E)
+    building.hitFlash = 400;
 
     if (building.hp <= 0) {
       this.villages.destroyBuilding(building);

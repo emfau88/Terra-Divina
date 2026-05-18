@@ -5,10 +5,11 @@
  * Neu: Visuelle Interpolationsfelder für sanfte Bewegung zwischen Kacheln.
  */
 
-import { FactionKey }  from '@game/factions/Faction';
-import { UnitRole }    from './UnitRoles';
-import { UNIT_DEFS }   from '@game/data/unitDefs';
-import { TILE }        from '@game/config';
+import { FactionKey }    from '@game/factions/Faction';
+import { FACTION_TRAITS } from '@game/factions/FactionTraits';
+import { UnitRole }       from './UnitRoles';
+import { UNIT_DEFS }      from '@game/data/unitDefs';
+import { TILE }           from '@game/config';
 
 let nextUnitId = 1;
 
@@ -80,7 +81,7 @@ export class Unit {
     this.role    = role;
     this.x       = x;
     this.y       = y;
-    this.maxHp   = UNIT_DEFS[role].maxHp;
+    this.maxHp   = Math.round(UNIT_DEFS[role].maxHp * FACTION_TRAITS[faction].unitHpMult);
     this.hp      = this.maxHp;
 
     // Visuelle Position direkt auf Kachelmittelpunkt initialisieren

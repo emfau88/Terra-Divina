@@ -8,7 +8,7 @@
 import { Unit }           from './Unit';
 import { UnitRole }       from './UnitRoles';
 import { UnitAI }         from './UnitAI';
-import { FactionKey }     from '@game/factions/Faction';
+import { FactionKey, FACTION_KEYS } from '@game/factions/Faction';
 import { VillageManager } from '@game/factions/VillageManager';
 import { WorldGrid }      from '@game/world/WorldGrid';
 import { BALANCE }        from '@game/data/balance';
@@ -32,10 +32,12 @@ export class UnitManager {
 
   // ─── Spawn ───────────────────────────────────────────────────────────────
 
-  spawnInitial(): void {
+  spawnInitial(factions?: FactionKey[]): void {
+    const active = factions ?? FACTION_KEYS.filter(k => this.villages.villages[k] !== undefined);
     for (let i = 0; i < 8; i++) {
-      this.spawnUnit('human');
-      this.spawnUnit('orc');
+      for (const faction of active) {
+        this.spawnUnit(faction);
+      }
     }
   }
 
@@ -80,7 +82,7 @@ export class UnitManager {
    * einer bestimmten Rolle hat. Wird nach jedem Tick aufgerufen.
    */
   private rebalanceRoles(): void {
-    for (const faction of ['human', 'orc'] as FactionKey[]) {
+    for (const faction of FACTION_KEYS) {
       const alive   = this.units.filter(u => u.faction === faction && !u.dead);
       const n       = alive.length;
       if (n < 4) continue;

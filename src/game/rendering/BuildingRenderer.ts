@@ -95,6 +95,12 @@ export class BuildingRenderer {
       case 'outpost':  this.drawOutpost(g, px, py, c, dmgAlpha);  break;
       case 'barracks': this.drawBarracks(g, px, py, c, dmgAlpha); break;
     }
+
+    // Treffer-Flash: rote halbtransparente Überlagerung über der Kachel (Phase 13E)
+    if (b.hitFlash > 0) {
+      g.fillStyle(0xff3333, 0.35);
+      g.fillRect(px, py, TILE, TILE);
+    }
   }
 
   // ─── Gebäude-Silhouetten (aus Referenz-Prototyp portiert) ────────────────

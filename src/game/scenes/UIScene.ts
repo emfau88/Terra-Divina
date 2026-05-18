@@ -1,14 +1,18 @@
 import Phaser from 'phaser';
 import { GameScene } from './GameScene';
 import { SpeedIndex } from '@game/simulation/SimulationClock';
-import { SimulationClock } from '@game/simulation/SimulationClock';
-import { EventFeed } from '@game/ui/EventFeed';
 import { GOAL_DAYS } from '@game/simulation/GoalSystem';
+import { FACTIONS } from '@game/factions/Faction';
 
 /**
- * UIScene — Phase 13A
+ * UIScene — Phase 17 (Terrain-Painting)
  *
- * Änderungen in Phase 13A:
+ * Änderungen in Phase 17:
+ * - Tab-Leiste im Dock: "Götter"-Tab (8 Werkzeuge) und "Terrain"-Tab (5 Werkzeuge)
+ * - Terrain-Werkzeuge: terrain-grass, terrain-water, terrain-forest, terrain-mountain, terrain-sand
+ * - selectTool() erkennt Terrain-Keys und aktiviert den korrekten Button
+ *
+ * Frühere Änderungen (Phase 13A):
  * - Standard-Tool geändert von 'inspect' auf 'heal'
  * - setupIntroOverlay: Uhr startet erst nach Klick auf "Welt starten"
  * - showResult: zeigt Sieg- oder Niederlage-Overlay
@@ -38,6 +42,14 @@ export class UIScene extends Phaser.Scene {
   private buildHud(): void {
     this.hudEl = document.createElement('div');
     this.hudEl.id = 'hud';
+
+    const fHum   = FACTIONS.human;
+    const fOrc   = FACTIONS.orc;
+    const fElf   = FACTIONS.elf;
+    const fDwarf = FACTIONS.dwarf;
+
+    const hex = (n: number) => '#' + n.toString(16).padStart(6, '0');
+
     this.hudEl.innerHTML = `
       <div class="hud-row">
         <span class="hud-label">Tag</span>
@@ -48,10 +60,14 @@ export class UIScene extends Phaser.Scene {
         <span class="hud-value" id="hud-tool">heal</span>
       </div>
       <div class="hud-row" style="margin-top:4px">
-        <span style="color:#5ec8ff;font-size:11px;font-weight:700;letter-spacing:.04em">HUM</span>
-        <span class="hud-value" id="hud-humans" style="color:#5ec8ff;font-size:12px">—</span>
-        <span style="color:#ff5d63;font-size:11px;font-weight:700;letter-spacing:.04em;margin-left:10px">ORC</span>
-        <span class="hud-value" id="hud-orcs" style="color:#ff5d63;font-size:12px">—</span>
+        <span style="color:${hex(fHum.color)};font-size:11px;font-weight:700;letter-spacing:.04em">${fHum.short}</span>
+        <span class="hud-value" id="hud-human" style="color:${hex(fHum.color)};font-size:12px">—</span>
+        <span style="color:${hex(fOrc.color)};font-size:11px;font-weight:700;letter-spacing:.04em;margin-left:8px">${fOrc.short}</span>
+        <span class="hud-value" id="hud-orc" style="color:${hex(fOrc.color)};font-size:12px">—</span>
+        <span style="color:${hex(fElf.color)};font-size:11px;font-weight:700;letter-spacing:.04em;margin-left:8px">${fElf.short}</span>
+        <span class="hud-value" id="hud-elf" style="color:${hex(fElf.color)};font-size:12px">—</span>
+        <span style="color:${hex(fDwarf.color)};font-size:11px;font-weight:700;letter-spacing:.04em;margin-left:8px">${fDwarf.short}</span>
+        <span class="hud-value" id="hud-dwarf" style="color:${hex(fDwarf.color)};font-size:12px">—</span>
       </div>
     `;
     document.body.appendChild(this.hudEl);
@@ -63,38 +79,123 @@ export class UIScene extends Phaser.Scene {
     this.dockEl = document.createElement('div');
     this.dockEl.id = 'tool-dock';
 
-    const tools = [
+    // ─── Tab-Leiste ──────────────────────────────────────────────────────────
+    const tabBar = document.createElement('div');
+    tabBar.className = 'dock-tabs';
+
+    const tabGoetter  = document.createElement('button');
+    tabGoetter.className = 'dock-tab active';
+    tabGoetter.textContent = '⚡ Götter';
+    tabGoetter.setAttribute('aria-label', 'Götterwerkzeuge');
+
+    const tabTerrain  = document.createElement('button');
+    tabTerrain.className = 'dock-tab';
+    tabTerrain.textContent = '🌍 Terrain';
+    tabTerrain.setAttribute('aria-label', 'Terrain-Werkzeuge');
+
+    tabBar.appendChild(tabGoetter);
+    tabBar.appendChild(tabTerrain);
+
+    // ─── Götter-Tab: 8 Werkzeuge in zwei Reihen ──────────────────────────────
+    const goetterGroup = document.createElement('div');
+    goetterGroup.className = 'tool-rows-group';
+
+    const goetterTools = [
       { key: 'inspect',   icon: 'ⓘ',  label: 'Info'    },
-      { key: 'human',     icon: '＋',  label: 'Mensch'  },
-      { key: 'orc',       icon: '＋',  label: 'Ork'     },
       { key: 'lightning', icon: 'ϟ',   label: 'Blitz'   },
       { key: 'fire',      icon: '🔥',  label: 'Feuer'   },
       { key: 'rain',      icon: '☔',  label: 'Regen'   },
       { key: 'meteor',    icon: '●',   label: 'Meteor'  },
       { key: 'heal',      icon: '✚',   label: 'Heilen'  },
+      { key: 'human',     icon: '＋',  label: 'Mensch'  },
+      { key: 'orc',       icon: '＋',  label: 'Ork'     },
+      { key: 'elf',       icon: '＋',  label: 'Elfe'    },
+      { key: 'dwarf',     icon: '＋',  label: 'Zwerg'   },
+      { key: 'wolf',      icon: '🐺',  label: 'Wolf'    },
+      { key: 'demon',     icon: '👿',  label: 'Dämon'   },
     ];
 
-    const row1 = document.createElement('div');
-    row1.className = 'tool-row';
-    const row2 = document.createElement('div');
-    row2.className = 'tool-row';
+    const goetterRow1 = document.createElement('div');
+    goetterRow1.className = 'tool-row';
+    const goetterRow2 = document.createElement('div');
+    goetterRow2.className = 'tool-row';
+    const goetterRow3 = document.createElement('div');
+    goetterRow3.className = 'tool-row';
 
-    tools.forEach((t, i) => {
+    goetterTools.forEach((t, i) => {
       const btn = document.createElement('button');
       btn.className = 'tool-btn';
       btn.dataset['toolKey'] = t.key;
       btn.setAttribute('aria-label', t.label);
       btn.innerHTML = `<span class="tool-icon">${t.icon}</span><span class="tool-label">${t.label}</span>`;
-      // Standard-Tool 'heal' wird als aktiv markiert
       if (t.key === this.activeToolKey) btn.classList.add('active');
       btn.addEventListener('pointerdown', (e) => {
         e.stopPropagation();
         this.selectTool(t.key);
       });
-      (i < 4 ? row1 : row2).appendChild(btn);
+      if (i < 4)      goetterRow1.appendChild(btn);
+      else if (i < 8) goetterRow2.appendChild(btn);
+      else            goetterRow3.appendChild(btn);
     });
 
-    // ─── Steuerungs-Reihe ────────────────────────────────────────────────────
+    goetterGroup.appendChild(goetterRow1);
+    goetterGroup.appendChild(goetterRow2);
+    goetterGroup.appendChild(goetterRow3);
+
+    // ─── Terrain-Tab: 5 Werkzeuge in einer Reihe ────────────────────────────
+    const terrainGroup = document.createElement('div');
+    terrainGroup.className = 'tool-rows-group hidden';
+
+    const terrainTools = [
+      { key: 'terrain-grass',    icon: '🟩', label: 'Gras'    },
+      { key: 'terrain-water',    icon: '🟦', label: 'Wasser'  },
+      { key: 'terrain-forest',   icon: '🌲', label: 'Wald'    },
+      { key: 'terrain-mountain', icon: '⛰',  label: 'Berg'    },
+      { key: 'terrain-sand',     icon: '🟨', label: 'Sand'    },
+    ];
+
+    const terrainRow = document.createElement('div');
+    terrainRow.className = 'tool-row';
+
+    terrainTools.forEach((t) => {
+      const btn = document.createElement('button');
+      btn.className = 'tool-btn';
+      btn.dataset['toolKey'] = t.key;
+      btn.setAttribute('aria-label', t.label);
+      btn.innerHTML = `<span class="tool-icon">${t.icon}</span><span class="tool-label">${t.label}</span>`;
+      btn.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        this.selectTool(t.key);
+      });
+      terrainRow.appendChild(btn);
+    });
+
+    terrainGroup.appendChild(terrainRow);
+
+    // ─── Tab-Wechsel-Logik ───────────────────────────────────────────────────
+    tabGoetter.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      // Tab umschalten
+      tabGoetter.classList.add('active');
+      tabTerrain.classList.remove('active');
+      goetterGroup.classList.remove('hidden');
+      terrainGroup.classList.add('hidden');
+      // Standard-Tool des Götter-Tabs auswählen
+      this.selectTool('heal');
+    });
+
+    tabTerrain.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      // Tab umschalten
+      tabTerrain.classList.add('active');
+      tabGoetter.classList.remove('active');
+      terrainGroup.classList.remove('hidden');
+      goetterGroup.classList.add('hidden');
+      // Standard-Tool des Terrain-Tabs auswählen
+      this.selectTool('terrain-grass');
+    });
+
+    // ─── Steuerungs-Reihe (immer sichtbar) ──────────────────────────────────
     const controls = document.createElement('div');
     controls.className = 'dock-controls';
 
@@ -138,8 +239,10 @@ export class UIScene extends Phaser.Scene {
     controls.appendChild(this.pauseBtn);
     controls.appendChild(speedGroup);
 
-    this.dockEl.appendChild(row1);
-    this.dockEl.appendChild(row2);
+    // ─── Dock zusammenbauen ──────────────────────────────────────────────────
+    this.dockEl.appendChild(tabBar);
+    this.dockEl.appendChild(goetterGroup);
+    this.dockEl.appendChild(terrainGroup);
     this.dockEl.appendChild(controls);
     document.body.appendChild(this.dockEl);
   }
@@ -167,37 +270,6 @@ export class UIScene extends Phaser.Scene {
     });
     const el = document.getElementById('hud-tool');
     if (el) el.textContent = key;
-  }
-
-  // ─── Intro-Overlay ───────────────────────────────────────────────────────
-
-  /**
-   * Verknüpft das Intro-Overlay mit der Uhr und dem EventFeed.
-   * Uhr läuft erst nach Klick auf "Welt starten".
-   */
-  setupIntroOverlay(clock: SimulationClock, feed: EventFeed): void {
-    // Uhr beim Start pausieren, bis der Spieler bestätigt
-    if (!clock.paused) clock.togglePause();
-    this.syncPauseBtn(clock.paused);
-
-    const overlay = document.getElementById('intro-overlay');
-    const startBtn = document.getElementById('btn-start-world');
-    if (!overlay || !startBtn) return;
-
-    startBtn.addEventListener('click', () => {
-      // Overlay ausblenden
-      overlay.classList.add('hidden');
-
-      // Uhr starten, falls noch pausiert
-      if (clock.paused) {
-        clock.togglePause();
-        this.syncPauseBtn(clock.paused);
-      }
-
-      // Willkommens-Nachrichten ins EventFeed einspeisen
-      feed.push('Eine neue Welt erwacht.', '#77d7ff');
-      feed.push(`Ziel: ${GOAL_DAYS} Tage überleben.`, '#ffca45');
-    }, { once: true });
   }
 
   // ─── Ergebnis-Overlay ────────────────────────────────────────────────────
@@ -234,11 +306,14 @@ export class UIScene extends Phaser.Scene {
   // ─── Öffentliche API ─────────────────────────────────────────────────────
 
   /**
-   * Aktualisiert die Tag-Anzeige im HUD ("Tag X / 30").
+   * Aktualisiert die Tag-Anzeige im HUD.
+   * Mit total: "Tag X / 30" (Szenario-Modus).
+   * Ohne total: "Tag X" (Sandbox-Modus).
    */
-  setDay(day: number, total: number = GOAL_DAYS): void {
+  setDay(day: number, total?: number): void {
     const el = document.getElementById('hud-day');
-    if (el) el.textContent = `${day} / ${total}`;
+    if (!el) return;
+    el.textContent = total !== undefined ? `${day} / ${total}` : `${day}`;
   }
 
   setStatus(status: string): void {
@@ -255,13 +330,8 @@ export class UIScene extends Phaser.Scene {
     el.style.color = colorMap[status] ?? 'var(--accent)';
   }
 
-  setHumanSummary(text: string): void {
-    const el = document.getElementById('hud-humans');
-    if (el) el.textContent = text;
-  }
-
-  setOrcSummary(text: string): void {
-    const el = document.getElementById('hud-orcs');
+  setFactionSummary(faction: string, text: string): void {
+    const el = document.getElementById(`hud-${faction}`);
     if (el) el.textContent = text;
   }
 

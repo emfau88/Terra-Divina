@@ -21,6 +21,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.scene.start('GameScene');
+    // Phase 15: Zuerst das Hauptmenü anzeigen, nicht direkt die Spielszene starten
+    this.scene.start('MainMenuScene');
   }
 }
