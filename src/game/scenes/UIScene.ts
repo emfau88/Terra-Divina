@@ -23,58 +23,58 @@ interface CategoryDef {
 const CATEGORIES: CategoryDef[] = [
   {
     key: 'destruction',
-    glyph: '⚡',
+    glyph: '💥',
     label: 'Zerstörung',
     hint: 'Blitz, Feuer und Meteor verändern die Welt mit Gewalt.',
     tools: [
-      { key: 'lightning', glyph: 'ϟ', label: 'Blitz'  },
-      { key: 'fire',      glyph: '✦', label: 'Feuer'  },
-      { key: 'meteor',    glyph: '★', label: 'Meteor' },
+      { key: 'lightning', glyph: '⚡', label: 'Blitz'  },
+      { key: 'fire',      glyph: '🔥', label: 'Feuer'  },
+      { key: 'meteor',    glyph: '☄️',  label: 'Meteor' },
     ],
   },
   {
     key: 'nature',
-    glyph: '❧',
+    glyph: '🌿',
     label: 'Natur',
     hint: 'Bringe Regen oder heile das Land.',
     tools: [
-      { key: 'rain', glyph: '↓', label: 'Regen'  },
-      { key: 'heal', glyph: '✚', label: 'Heilen' },
+      { key: 'rain', glyph: '🌧️', label: 'Regen'  },
+      { key: 'heal', glyph: '✚',  label: 'Heilen' },
     ],
   },
   {
     key: 'civilizations',
-    glyph: '⌂',
+    glyph: '🏘️',
     label: 'Völker',
     hint: 'Erschaffe Zivilisationen und beobachte, wie sie wachsen.',
     tools: [
-      { key: 'human', glyph: 'H', label: 'Mensch' },
-      { key: 'orc',   glyph: 'O', label: 'Ork'    },
-      { key: 'elf',   glyph: 'E', label: 'Elfe'   },
-      { key: 'dwarf', glyph: 'Z', label: 'Zwerg'  },
+      { key: 'human', glyph: '👤', label: 'Mensch' },
+      { key: 'orc',   glyph: '👹', label: 'Ork'    },
+      { key: 'elf',   glyph: '🧝', label: 'Elfe'   },
+      { key: 'dwarf', glyph: '⛏️',  label: 'Zwerg'  },
     ],
   },
   {
     key: 'creatures',
-    glyph: '♦',
+    glyph: '🐾',
     label: 'Kreaturen',
     hint: 'Setze wilde Kreaturen in die Welt.',
     tools: [
-      { key: 'wolf',  glyph: 'W', label: 'Wolf'  },
-      { key: 'demon', glyph: 'D', label: 'Dämon' },
+      { key: 'wolf',  glyph: '🐺', label: 'Wolf'  },
+      { key: 'demon', glyph: '👿', label: 'Dämon' },
     ],
   },
   {
     key: 'terrain',
-    glyph: '◈',
+    glyph: '🗺️',
     label: 'Terrain',
     hint: 'Male das Land neu: Gras, Wasser, Wald, Berge.',
     tools: [
-      { key: 'terrain-grass',    glyph: '▪', label: 'Gras'   },
-      { key: 'terrain-water',    glyph: '≈', label: 'Wasser' },
-      { key: 'terrain-forest',   glyph: '♣', label: 'Wald'   },
-      { key: 'terrain-mountain', glyph: '▲', label: 'Berg'   },
-      { key: 'terrain-sand',     glyph: '·', label: 'Sand'   },
+      { key: 'terrain-grass',    glyph: '🟩', label: 'Gras'   },
+      { key: 'terrain-water',    glyph: '🟦', label: 'Wasser' },
+      { key: 'terrain-forest',   glyph: '🌲', label: 'Wald'   },
+      { key: 'terrain-mountain', glyph: '⛰️',  label: 'Berg'   },
+      { key: 'terrain-sand',     glyph: '🟨', label: 'Sand'   },
     ],
   },
   {
@@ -323,7 +323,7 @@ export class UIScene extends Phaser.Scene {
   // ─── Sync helpers ─────────────────────────────────────────────────────────
 
   private setPauseContent(paused: boolean): void {
-    const glyph = paused ? '▶' : '⏸';
+    const glyph = paused ? '▶️' : '⏸️';
     const label = paused ? 'Weiter' : 'Pause';
     this.pauseBtn.innerHTML = `<span class="tool-glyph">${glyph}</span><span class="tool-label">${label}</span>`;
   }
