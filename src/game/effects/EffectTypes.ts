@@ -56,6 +56,10 @@ export interface MeteorEffect extends BaseEffect {
   readonly type:      'meteor';
   readonly fromPy:    number;   // Startpunkt Y (oben im Viewport)
   readonly impactR:   number;
+  /** Optionaler Callback, der genau einmal beim Einschlag ausgelöst wird. */
+  onImpact?:    () => void;
+  /** Verhindert doppelten Callback-Aufruf. */
+  impactFired:  boolean;
 }
 
 export interface HealEffect extends BaseEffect {

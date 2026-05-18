@@ -85,12 +85,15 @@ export class EffectSystem {
     } as ImpactRingEffect);
   }
 
-  spawnMeteor(px: number, py: number, fromPy: number, radiusPx: number): void {
+  spawnMeteor(px: number, py: number, fromPy: number, radiusPx: number, onImpact?: () => void): void {
+    // Meteor-Effekt mit optionalem Einschlag-Callback
     this.effects.push({
       id: newEffectId(), type: 'meteor',
       px, py, fromPy, age: 0, duration: 550,
       impactR: radiusPx,
-    } as unknown as MeteorEffect);
+      onImpact,
+      impactFired: false,
+    } as MeteorEffect);
     // Impact-Ring nach Einschlag
     this.effects.push({
       id: newEffectId(), type: 'ring',
@@ -144,7 +147,15 @@ export class EffectSystem {
         const sp = e as SparkEffect;
         sp.vx *= 0.94;
         sp.vy += 0.12;   // Gravitation
-        sp.px  // px ist readonly — Bewegung nur visuell beim Zeichnen
+        void sp.px;      // px ist readonly — Bewegung nur visuell beim Zeichnen
+      }
+      // Meteor-Einschlag-Callback genau einmal bei t >= 0.55 auslösen
+      if (e.type === 'meteor') {
+        const me = e as MeteorEffect;
+        if (!me.impactFired && effectT(me) >= 0.55) {
+          me.impactFired = true;
+          me.onImpact?.();
+        }
       }
     }
     this.effects = this.effects.filter(e => e.age < e.duration);
@@ -271,9 +282,9 @@ export class EffectSystem {
   }
 
   private drawMeteor(e: MeteorEffect, t: number, _camTop: number): void {
-    const g   = this.g;
-    const data = e as unknown as Record<string, number>;
-    const fromPy: number = data['fromPy'] ?? e.py - 200;
+    const g      = this.g;
+    // fromPy ist jetzt direkt im Typen verfügbar
+    const fromPy = e.fromPy;
 
     if (t < 0.55) {
       // Einflug: Feuerball fällt herab

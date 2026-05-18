@@ -1,8 +1,14 @@
 /**
- * WorldRenderer — Phase VFX
+ * WorldRenderer — Phase VFX (Performance-Fix)
  *
- * Zeichnet alle Kacheln. Feuer-Kacheln flackern pro Frame
- * via time-Parameter (ms seit Spielstart).
+ * Zwei separate Graphics-Ebenen:
+ *   mapG  — statisches Terrain; wird nur neu gezeichnet wenn Kacheln ihren
+ *            Typ wechseln (z. B. Feuer-Ausbreitung, Löschung). Feuer-Kacheln
+ *            werden hier als verkohlter Boden (Asche-Farbe) gezeichnet.
+ *   fireG — nur Feuer-Flackern; wird ~12× pro Sekunde geleert und neu
+ *            gezeichnet, enthält aber NUR Feuer-Kacheln, nicht das gesamte
+ *            Terrain. Dadurch werden bei 80 ms Flacker-Takt maximal so viele
+ *            Kacheln gezeichnet wie aktuell brennen — nicht alle 3920.
  */
 
 import Phaser from 'phaser';
@@ -11,21 +17,25 @@ import { TileType } from '@game/world/TileTypes';
 import { TILE, COLS, ROWS } from '@game/config';
 
 export class WorldRenderer {
-  private readonly g:    Phaser.GameObjects.Graphics;
-  private readonly grid: WorldGrid;
+  /** Statische Terrain-Ebene — nur bei Kachel-Typwechseln neu gezeichnet. */
+  private readonly mapG:  Phaser.GameObjects.Graphics;
+  /** Feuer-Flacker-Ebene — wird unabhängig vom Terrain animiert. */
+  private readonly fireG: Phaser.GameObjects.Graphics;
+  private readonly grid:  WorldGrid;
 
   /** Wird in update() von GameScene gesetzt, damit Feuer flackert. */
   time: number = 0;
 
-  constructor(graphics: Phaser.GameObjects.Graphics, grid: WorldGrid) {
-    this.g    = graphics;
-    this.grid = grid;
+  constructor(mapGraphics: Phaser.GameObjects.Graphics, grid: WorldGrid, fireGraphics: Phaser.GameObjects.Graphics) {
+    this.mapG  = mapGraphics;
+    this.fireG = fireGraphics;
+    this.grid  = grid;
   }
 
-  // ─── Vollständige Neuzeichnung ────────────────────────────────────────────
+  // ─── Vollständige Neuzeichnung (Terrain) ─────────────────────────────────
 
   drawAll(): void {
-    const g = this.g;
+    const g = this.mapG;
     g.clear();
     for (let y = 0; y < ROWS; y++) {
       for (let x = 0; x < COLS; x++) {
@@ -34,16 +44,19 @@ export class WorldRenderer {
     }
   }
 
-  // ─── Einzelne Kachel ─────────────────────────────────────────────────────
+  // ─── Einzelne Kachel auf mapG ─────────────────────────────────────────────
 
   drawTile(x: number, y: number): void {
-    const g  = this.g;
+    const g  = this.mapG;
     const t  = this.grid.get(x, y);
     const m  = this.grid.getMeta(x, y);
     const px = x * TILE;
     const py = y * TILE;
 
-    g.fillStyle(WorldRenderer.tileColor(t, m.variant), 1);
+    // Feuer-Kacheln werden auf mapG als verkohlter Boden dargestellt.
+    // Das Flackern übernimmt ausschließlich fireG via drawFireLayer().
+    const renderType = t === TileType.Fire ? TileType.Ash : t;
+    g.fillStyle(WorldRenderer.tileColor(renderType, m.variant), 1);
     g.fillRect(px, py, TILE, TILE);
 
     // ─── Dekor ──────────────────────────────────────────────────────────────
@@ -67,15 +80,34 @@ export class WorldRenderer {
       g.fillTriangle(px + 9, py + 3, px + 7, py + 8, px + 11, py + 8);
     }
 
-    if (t === TileType.Fire) {
-      this.drawFireTile(px, py, x, y);
+    // Feuer wird NICHT hier gezeichnet — nur auf fireG via drawFireLayer()
+  }
+
+  // ─── Feuer-Flacker-Layer (nur fireG, nicht mapG) ─────────────────────────
+
+  /**
+   * Löscht fireG und zeichnet nur die aktuell brennenden Kacheln neu.
+   * Terrain (mapG) bleibt komplett unberührt.
+   * Wird von GameScene alle ~80 ms aufgerufen statt drawAll().
+   */
+  drawFireLayer(time: number): void {
+    this.time = time;
+    const g   = this.fireG;
+    g.clear();
+
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        if (this.grid.get(x, y) === TileType.Fire) {
+          this.drawFireTile(x * TILE, y * TILE, x, y);
+        }
+      }
     }
   }
 
   // ─── Feuer-Flacker-Rendering ──────────────────────────────────────────────
 
   private drawFireTile(px: number, py: number, tx: number, ty: number): void {
-    const g = this.g;
+    const g = this.fireG;
 
     // Flacker-Phasen: jede Kachel hat eigene Phase basierend auf Position + Zeit
     const phase  = (this.time * 0.006 + tx * 3.7 + ty * 5.3) % (Math.PI * 2);

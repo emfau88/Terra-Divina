@@ -130,16 +130,14 @@ export class ToolController {
     const py     = ty * TILE + TILE / 2;
     const camTop = this.getCamTop();
 
-    // 1. VFX zuerst — visueller Einflug
-    this.effects.spawnMeteor(px, py, camTop, 4 * TILE);
-
-    // 2. Simulation — Schaden passiert sofort (VFX ist dekorativ)
-    applyMeteor(tx, ty, this.grid, this.fire, this.villages, this.units);
-
-    // 3. Renderer
-    this.worldRenderer.drawAll();
-    this.buildingRenderer.drawAll(this.villages.liveBuildings);
-    this.unitRenderer.drawAll(this.units.liveUnits);
+    // VFX starten — Simulation wird erst beim Einschlag (t >= 0.55) ausgelöst
+    this.effects.spawnMeteor(px, py, camTop, 4 * TILE, () => {
+      // Einschlag-Callback: Simulation und Renderer werden zeitverzögert ausgeführt
+      applyMeteor(tx, ty, this.grid, this.fire, this.villages, this.units);
+      this.worldRenderer.drawAll();
+      this.buildingRenderer.drawAll(this.villages.liveBuildings);
+      this.unitRenderer.drawAll(this.units.liveUnits);
+    });
     return 'ok';
   }
 

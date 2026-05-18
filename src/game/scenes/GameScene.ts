@@ -129,14 +129,16 @@ export class GameScene extends Phaser.Scene {
     // 7. Kamera
     this.setupCamera();
 
-    // 8. Renderer — Reihenfolge: map → shadow → build → unit → effects
+    // 8. Renderer — Reihenfolge: map → fireG → shadow → build → unit → effects
+    // fireG liegt direkt über mapG damit Feuer-Flackern das Terrain überlagert
     const mapG     = this.add.graphics();
+    const fireG    = this.add.graphics();   // Feuer-Flacker-Ebene (nur brennende Kacheln)
     const shadowG  = this.add.graphics();
     const buildG   = this.add.graphics();
     const unitG    = this.add.graphics();
     const effectsG = this.add.graphics();   // ganz oben
 
-    this.worldRenderer = new WorldRenderer(mapG, this.grid);
+    this.worldRenderer = new WorldRenderer(mapG, this.grid, fireG);
     this.worldRenderer.drawAll();
 
     this.buildingRenderer = new BuildingRenderer(buildG, shadowG);
@@ -225,8 +227,7 @@ export class GameScene extends Phaser.Scene {
   // ─── Update ──────────────────────────────────────────────────────────────
 
   update(time: number, delta: number): void {
-    // WorldRenderer bekommt aktuelle Zeit für Feuer-Flackern
-    this.worldRenderer.time = time;
+    // Zeit wird direkt in drawFireLayer(time) übergeben — kein separates Setzen nötig
 
     if (this.clock.paused) {
       // Auch im Pause Effekte und Feuer animieren
@@ -240,7 +241,8 @@ export class GameScene extends Phaser.Scene {
         this.fireRedrawAccum += delta;
         if (this.fireRedrawAccum >= this.FIRE_REDRAW_MS) {
           this.fireRedrawAccum = 0;
-          this.worldRenderer.drawAll();
+          // Nur fireG neu zeichnen — mapG bleibt unberührt
+          this.worldRenderer.drawFireLayer(time);
         }
       }
       return;
@@ -269,15 +271,16 @@ export class GameScene extends Phaser.Scene {
     // Feuer-Ausbreitung (eigener Akkumulator im FireSystem)
     const fireTicked = this.fireSystem.tick(scaledDelta);
     if (fireTicked) {
+      // Spread-Tick: mapG neu zeichnen (Kachel-Typwechsel), fireG folgt beim nächsten Flacker-Tick
       this.worldRenderer.drawAll();
       this.buildingRenderer.drawAll(this.villageManager.liveBuildings);
       this.unitRenderer.drawAll(this.unitManager.liveUnits);
     } else if (this.fireSystem.hasFire) {
-      // Flacker-Neuzeichnung auch ohne Spread-Tick
+      // Flacker-Tick: nur fireG neu zeichnen — mapG bleibt unberührt
       this.fireRedrawAccum += delta;
       if (this.fireRedrawAccum >= this.FIRE_REDRAW_MS) {
         this.fireRedrawAccum = 0;
-        this.worldRenderer.drawAll();
+        this.worldRenderer.drawFireLayer(time);
       }
     }
 
