@@ -67,10 +67,17 @@ export interface HealEffect extends BaseEffect {
   readonly radius: number;
 }
 
+/** Spawn-Effekt: expandierender Ring und Funken beim Erscheinen einer neuen Einheit. */
+export interface SpawnEffect extends BaseEffect {
+  readonly type:     'spawn';
+  readonly radiusPx: number;
+}
+
 export type Effect =
   | LightningEffect
   | ImpactRingEffect
   | SparkEffect
   | RainEffect
   | MeteorEffect
-  | HealEffect;
+  | HealEffect
+  | SpawnEffect;

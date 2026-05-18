@@ -69,6 +69,11 @@ export class Unit {
   /** Aktueller Pixel-Y für die Darstellung (interpoliert). */
   visualY: number;
 
+  // ─── Treffer-Flash (Phase 13D) ────────────────────────────────────────────
+
+  /** Treffer-Flash Timer in ms — Einheit wird weiß/gelb dargestellt wenn > 0. */
+  hitFlash: number = 0;
+
   constructor(faction: FactionKey, role: UnitRole, x: number, y: number) {
     this.id      = nextUnitId++;
     this.faction = faction;

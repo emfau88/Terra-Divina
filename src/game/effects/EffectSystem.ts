@@ -16,7 +16,7 @@ import { TILE } from '@game/config';
 import {
   Effect, effectT, newEffectId,
   LightningEffect, ImpactRingEffect, SparkEffect,
-  RainEffect, MeteorEffect, HealEffect,
+  RainEffect, MeteorEffect, HealEffect, SpawnEffect,
 } from './EffectTypes';
 
 function rnd(min: number, max: number): number {
@@ -137,6 +137,32 @@ export class EffectSystem {
     } as ImpactRingEffect);
   }
 
+  /** Spawn-VFX: expandierender Ring + 8 Kreisfunken um den Spawn-Punkt. */
+  spawnSpawnEffect(px: number, py: number, radiusPx: number): void {
+    // Haupt-Spawn-Effekt (expandierender Ring + Mittelpunkt-Schimmer)
+    this.effects.push({
+      id: newEffectId(), type: 'spawn',
+      px, py, age: 0, duration: 500,
+      radiusPx,
+    } as SpawnEffect);
+
+    // 8 Funken gleichmäßig um den Kreis verteilt
+    for (let i = 0; i < 8; i++) {
+      const angle    = i * Math.PI / 4;
+      const speed    = radiusPx * 1.2;
+      const color    = i % 2 === 0 ? 0xffffff : 0xaaffcc;
+      // Gestaffelte Dauer: 300–450 ms
+      const duration = 300 + i * (150 / 7);
+      this.effects.push({
+        id: newEffectId(), type: 'spark',
+        px, py, age: 0, duration,
+        color,
+        vx: Math.cos(angle) * speed / 60,
+        vy: Math.sin(angle) * speed / 60,
+      } as SparkEffect);
+    }
+  }
+
   // ─── Update ──────────────────────────────────────────────────────────────
 
   update(deltaMs: number): void {
@@ -178,6 +204,7 @@ export class EffectSystem {
         case 'rain':      this.drawRain(e as RainEffect, t); break;
         case 'meteor':    this.drawMeteor(e as MeteorEffect, t, camTop); break;
         case 'heal':      this.drawHeal(e as HealEffect, t); break;
+        case 'spawn':     this.drawSpawnEffect(e as SpawnEffect, this.g); break;
       }
     }
   }
@@ -334,6 +361,28 @@ export class EffectSystem {
     if (t < 0.4) {
       g.fillStyle(0x80ffb2, (1 - t / 0.4) * 0.18);
       g.fillCircle(e.px, e.py, e.radius);
+    }
+  }
+
+  /** Spawn-Ring: expandierender weißer Kreis-Ring der ausblendet
+   *  + heller weißer Füllkreis in der Mitte der nur im ersten Drittel sichtbar ist. */
+  private drawSpawnEffect(e: SpawnEffect, g: Phaser.GameObjects.Graphics): void {
+    const t = effectT(e);
+
+    // Expandierender Ring: von 0 bis radiusPx, blendet aus
+    const ringAlpha = 1 - t;
+    const ringR     = e.radiusPx * t;
+    g.lineStyle(3, 0xffffff, ringAlpha * 0.9);
+    g.strokeCircle(e.px, e.py, ringR);
+
+    // Heller Füllkreis in der Mitte: schrumpft von radiusPx*0.4 zu 0,
+    // nur während der ersten 30% der Laufzeit sichtbar
+    if (t < 0.3) {
+      const innerT     = t / 0.3;                          // 0→1 in den ersten 30%
+      const innerAlpha = 1 - innerT;
+      const innerR     = e.radiusPx * 0.4 * (1 - innerT);
+      g.fillStyle(0xffffff, innerAlpha * 0.85);
+      g.fillCircle(e.px, e.py, innerR);
     }
   }
 }

@@ -41,8 +41,9 @@ export class UnitRenderer {
     g.fillStyle(0x000000, 0.25);
     g.fillEllipse(px, py + 6, 13, 5);
 
-    // Körper
-    g.fillStyle(fc.color, 1);
+    // Körper — bei aktivem Treffer-Flash in hellem Weiß-Gelb zeichnen
+    const bodyColor = u.hitFlash > 0 ? 0xffffa0 : fc.color;
+    g.fillStyle(bodyColor, 1);
     g.fillCircle(px, py, 6);
 
     // Glanzpunkt

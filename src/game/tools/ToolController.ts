@@ -16,6 +16,7 @@ import { EffectSystem }   from '@game/effects/EffectSystem';
 import { WorldRenderer }  from '@game/rendering/WorldRenderer';
 import { BuildingRenderer } from '@game/rendering/BuildingRenderer';
 import { UnitRenderer }   from '@game/rendering/UnitRenderer';
+import { EventFeed }      from '@game/ui/EventFeed';
 import { TILE }           from '@game/config';
 import {
   applyLightning,
@@ -34,6 +35,7 @@ export class ToolController {
   private readonly units:    UnitManager;
   private readonly fire:     FireSystem;
   private readonly effects:  EffectSystem;
+  private readonly feed:     EventFeed;
 
   private readonly worldRenderer:    WorldRenderer;
   private readonly buildingRenderer: BuildingRenderer;
@@ -51,12 +53,14 @@ export class ToolController {
     worldRenderer:    WorldRenderer,
     buildingRenderer: BuildingRenderer,
     unitRenderer:     UnitRenderer,
+    feed:             EventFeed,
   ) {
     this.grid             = grid;
     this.villages         = villages;
     this.units            = units;
     this.fire             = fire;
     this.effects          = effects;
+    this.feed             = feed;
     this.worldRenderer    = worldRenderer;
     this.buildingRenderer = buildingRenderer;
     this.unitRenderer     = unitRenderer;
@@ -89,7 +93,16 @@ export class ToolController {
     const camTop = this.getCamTop();
     this.effects.spawnLightning(px, py, camTop);
 
-    // 3. Renderer
+    // 3. Treffer-Flash auf nächster Einheit im Radius 3 setzen
+    const hitUnit = this.units.liveUnits
+      .filter(u => Math.abs(u.x - tx) <= 3 && Math.abs(u.y - ty) <= 3)
+      .sort((a, b) => Math.hypot(a.x - tx, a.y - ty) - Math.hypot(b.x - tx, b.y - ty))[0];
+    if (hitUnit) hitUnit.hitFlash = 180;
+
+    // 4. EventFeed-Meldung
+    this.feed.push('⚡ Blitz schlägt ein', '#b6f3ff');
+
+    // 5. Renderer
     this.worldRenderer.drawAll();
     this.unitRenderer.drawAll(this.units.liveUnits);
     return 'ok';
@@ -105,7 +118,10 @@ export class ToolController {
     const py = ty * TILE + TILE / 2;
     this.effects.spawnImpactRing(px, py, 0xff6622, TILE * 1.8);
 
-    // 3. Renderer
+    // 3. EventFeed-Meldung
+    this.feed.push('🔥 Feuer bricht aus', '#ff9944');
+
+    // 4. Renderer
     this.worldRenderer.drawAll();
     return 'ok';
   }
@@ -119,7 +135,10 @@ export class ToolController {
     const py = ty * TILE + TILE / 2;
     this.effects.spawnRain(px, py, 5 * TILE);
 
-    // 3. Renderer
+    // 3. EventFeed-Meldung
+    this.feed.push('🌧 Regen löscht das Feuer', '#89c7ff');
+
+    // 4. Renderer
     this.worldRenderer.drawAll();
     this.unitRenderer.drawAll(this.units.liveUnits);
     return 'ok';
@@ -134,6 +153,8 @@ export class ToolController {
     this.effects.spawnMeteor(px, py, camTop, 4 * TILE, () => {
       // Einschlag-Callback: Simulation und Renderer werden zeitverzögert ausgeführt
       applyMeteor(tx, ty, this.grid, this.fire, this.villages, this.units);
+      // EventFeed-Meldung beim Einschlag
+      this.feed.push('☄ Meteor schlägt ein!', '#ff9d41');
       this.worldRenderer.drawAll();
       this.buildingRenderer.drawAll(this.villages.liveBuildings);
       this.unitRenderer.drawAll(this.units.liveUnits);
@@ -150,7 +171,10 @@ export class ToolController {
     const py = ty * TILE + TILE / 2;
     this.effects.spawnHeal(px, py, 3 * TILE);
 
-    // 3. Renderer
+    // 3. EventFeed-Meldung
+    this.feed.push('✨ Heilung wirkt', '#80ffb2');
+
+    // 4. Renderer
     this.buildingRenderer.drawAll(this.villages.liveBuildings);
     this.unitRenderer.drawAll(this.units.liveUnits);
     return 'ok';
@@ -159,6 +183,15 @@ export class ToolController {
   private useSpawn(tx: number, ty: number, faction: 'human' | 'orc'): ToolResult {
     const ok = applySpawnUnit(tx, ty, faction, this.grid, this.units);
     if (!ok) return 'cap-reached';
+
+    // VFX — Spawn-Ring und Kreisfunken
+    const px = tx * TILE + TILE / 2;
+    const py = ty * TILE + TILE / 2;
+    this.effects.spawnSpawnEffect(px, py, 2 * TILE);
+
+    // EventFeed-Meldung
+    this.feed.push('＋ Neue Einheit erscheint', '#aaffcc');
+
     this.unitRenderer.drawAll(this.units.liveUnits);
     return 'ok';
   }

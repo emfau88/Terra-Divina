@@ -162,6 +162,7 @@ export class GameScene extends Phaser.Scene {
       this.worldRenderer,
       this.buildingRenderer,
       this.unitRenderer,
+      this.eventFeed,
     );
     // Kamera-Oberkante für Blitz-/Meteor-Startpunkt
     this.toolController.getCamTop = () => {
@@ -215,9 +216,7 @@ export class GameScene extends Phaser.Scene {
       }
 
       const result = this.toolController.use(tool, tx, ty);
-      if (result === 'ok') {
-        this.eventFeed.push(`${this.toolLabel(tool)} angewendet`, '#ffe28a');
-      } else if (result === 'cap-reached') {
+      if (result === 'cap-reached') {
         this.eventFeed.push('Bevölkerungsobergrenze erreicht!', '#ff9944');
       } else if (result === 'no-target') {
         this.eventFeed.push('Kein gültiges Ziel', '#888');
@@ -293,6 +292,12 @@ export class GameScene extends Phaser.Scene {
       const maxStep = VISUAL_SPEED_PX_PER_MS * delta;
       let anyMoving = false;
       for (const u of this.unitManager.liveUnits) {
+        // Treffer-Flash-Timer herunterzählen (Phase 13D)
+        if (u.hitFlash > 0) {
+          u.hitFlash = Math.max(0, u.hitFlash - delta);
+          anyMoving = true;   // Neuzeichnung erzwingen solange Flash aktiv
+        }
+
         // Logischer Zielpixel dieser Einheit
         const targetX = u.x * TILE + TILE / 2;
         const targetY = u.y * TILE + TILE / 2;
@@ -360,14 +365,6 @@ export class GameScene extends Phaser.Scene {
     ui.setOrcSummary(
       o ? `${this.unitManager.liveCount('orc')}  F${Math.floor(o.food)}  W${Math.floor(o.wood)}  L${o.level}` : '—',
     );
-  }
-
-  private toolLabel(tool: string): string {
-    const map: Record<string, string> = {
-      lightning: 'Blitz', fire: 'Feuer', rain: 'Regen',
-      meteor: 'Meteor', heal: 'Heilung', human: 'Mensch', orc: 'Ork',
-    };
-    return map[tool] ?? tool;
   }
 
   // ─── Öffentliche API ─────────────────────────────────────────────────────
