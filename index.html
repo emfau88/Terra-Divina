@@ -17,5 +17,25 @@
   <button id="btn-fullscreen" aria-label="Vollbild" title="Vollbild">⛶</button>
 
   <script type="module" src="/src/main.ts"></script>
+
+  <!-- Intro-Overlay: wird beim Start angezeigt, Uhr startet erst nach Klick -->
+  <div id="intro-overlay">
+    <div id="intro-box">
+      <h1>Terra Divina</h1>
+      <p class="intro-sub">Eine kleine lebendige Welt erwacht.</p>
+      <div class="intro-goal"><strong>Ziel:</strong> Hilf der Welt, 30 Tage zu überleben.</div>
+      <p class="intro-hint">Setze deine Gotteskräfte weise ein. Feuer, Krieg, Hunger und Katastrophen können ein Dorf schnell auslöschen.</p>
+      <button id="btn-start-world">Welt starten</button>
+    </div>
+  </div>
+
+  <!-- Ergebnis-Overlay: erscheint nach Sieg oder Niederlage -->
+  <div id="result-overlay" class="hidden">
+    <div id="result-box">
+      <h2 id="result-title"></h2>
+      <p id="result-message"></p>
+      <button id="btn-result-action"></button>
+    </div>
+  </div>
 </body>
 </html>

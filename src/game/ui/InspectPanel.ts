@@ -150,6 +150,8 @@ export class InspectPanel {
   close(): void {
     this.target = null;
     this.panelEl.classList.remove('visible');
+    // CSS-Klasse entfernen, damit EventFeed wieder sichtbar wird
+    document.body.classList.remove('inspect-open');
   }
 
   get isOpen(): boolean {
@@ -166,6 +168,8 @@ export class InspectPanel {
     this.titleEl.textContent = title;
     this.bodyEl.textContent  = body;
     this.panelEl.classList.add('visible');
+    // CSS-Klasse setzen, damit EventFeed ausgeblendet wird
+    document.body.classList.add('inspect-open');
   }
 
   private unitBody(u: Unit): string {

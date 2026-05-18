@@ -18,16 +18,17 @@ import { ToolController }     from '@game/tools/ToolController';
 import { InspectPanel }       from '@game/ui/InspectPanel';
 import { EventFeed }          from '@game/ui/EventFeed';
 import { FACTIONS }           from '@game/factions/Faction';
+import { GoalSystem }         from '@game/simulation/GoalSystem';
 import { UIScene }            from './UIScene';
 
 /**
- * GameScene — Phase VFX
+ * GameScene — Phase 13A
  *
- * Neu:
- * - FireSystem: organische Ausbreitung mit burn-Countdown
- * - EffectSystem: transiente VFX (Blitz, Regen, Meteor, Heilung)
- * - WorldRenderer.time: flackernde Feuer-Kacheln
- * - EffectSystem-Graphics-Layer über allen anderen
+ * Neu gegenüber Phase VFX:
+ * - GoalSystem: 30-Tage-Überlebensziel
+ * - Tages-Akkumulator: alle 8000 ms (skaliert) = 1 Tag
+ * - Intro-Overlay wird nach Scene-Start verdrahtet
+ * - UIScene.showResult() bei Sieg/Niederlage aufgerufen
  */
 export class GameScene extends Phaser.Scene {
   private grid!:             WorldGrid;
@@ -42,6 +43,7 @@ export class GameScene extends Phaser.Scene {
   private toolController!:   ToolController;
   private inspectPanel!:     InspectPanel;
   private eventFeed!:        EventFeed;
+  private goalSystem!:       GoalSystem;
 
   private worldRenderer!:    WorldRenderer;
   private buildingRenderer!: BuildingRenderer;
@@ -55,9 +57,13 @@ export class GameScene extends Phaser.Scene {
   private villageAccum = 0;
   /** Für Feuer-Flackern: Neu-Zeichnung nur wenn Feuer aktiv */
   private fireRedrawAccum = 0;
+  /** Akkumulator für den Tages-Zähler des GoalSystem (skalierte ms). */
+  private dayAccum     = 0;
   private readonly AI_INTERVAL_MS       = 250;
   private readonly VILLAGE_INTERVAL_MS  = 650;
   private readonly FIRE_REDRAW_MS       = 80;   // ~12 fps Flacker-Rate
+  /** 8000 skalierte ms = 1 Tag im Ziel-System. */
+  private readonly DAY_INTERVAL_MS      = 8000;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -85,6 +91,13 @@ export class GameScene extends Phaser.Scene {
     // 5. UI-Systeme
     this.eventFeed    = new EventFeed();
     this.inspectPanel = new InspectPanel(this.villageManager, this.unitManager, this.grid);
+
+    // 5b. Ziel-System
+    this.goalSystem = new GoalSystem();
+    this.goalSystem.onGoalChange = (state) => {
+      const ui = this.scene.get('UIScene') as UIScene | null;
+      ui?.showResult(state === 'won');
+    };
 
     // 6. Callbacks
     this.resourceSystem.onSpawn = (faction) => {
@@ -157,8 +170,14 @@ export class GameScene extends Phaser.Scene {
     this.cameraController = new CameraController(this, this.cameras.main);
     this.setupTapHandling();
 
-    // 11. UI
+    // 11. UI starten und Intro-Overlay verdrahten sobald UIScene bereit ist
     this.scene.launch('UIScene');
+
+    // UIScene ist async — warten bis 'create' der UIScene abgeschlossen ist
+    this.scene.get('UIScene').events.once(Phaser.Scenes.Events.CREATE, () => {
+      const ui = this.scene.get('UIScene') as UIScene | null;
+      ui?.setupIntroOverlay(this.clock, this.eventFeed);
+    });
   }
 
   private setupCamera(): void {
@@ -231,6 +250,14 @@ export class GameScene extends Phaser.Scene {
     this.aiAccum      += scaledDelta;
     this.villageAccum += scaledDelta;
 
+    // Tages-Akkumulator: alle DAY_INTERVAL_MS skalierte ms = 1 Tag
+    this.dayAccum += scaledDelta;
+    if (this.dayAccum >= this.DAY_INTERVAL_MS) {
+      this.dayAccum = 0;
+      this.goalSystem.addDay(this.villageManager, this.unitManager);
+      this.pushHudUpdate();
+    }
+
     // EffectSystem läuft immer mit echtem delta (nicht skaliert)
     this.effectSystem.update(delta);
     this.effectSystem.drawAll(
@@ -283,7 +310,8 @@ export class GameScene extends Phaser.Scene {
     const h = this.villageManager.villages.human;
     const o = this.villageManager.villages.orc;
 
-    ui.setDay(this.clock.day);
+    // GoalSystem-Tag für HUD verwenden (zeigt Fortschritt zum Ziel)
+    ui.setDay(this.goalSystem.day);
     ui.setStatus(this.diplomacy.statusText);
 
     ui.setHumanSummary(

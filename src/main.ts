@@ -78,6 +78,8 @@ const config: Phaser.Types.Core.GameConfig = {
 };
 
 window.addEventListener('load', () => {
+  // --vh nach vollständigem Laden aktualisieren (safe area, toolbar-Höhe)
+  setVH();
   new Phaser.Game(config);
   setupFullscreen();
 });
