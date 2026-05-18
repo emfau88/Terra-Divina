@@ -62,6 +62,11 @@ export class Unit {
 
   dead: boolean = false;
 
+  // ─── Hunger-Status (Fix 2) ────────────────────────────────────────────────
+
+  /** true wenn diese Einheit gerade Hungeschaden erhält (kein Essen in Dorf). */
+  isStarving: boolean = false;
+
   // ─── Visuelle Bewegungsinterpolation (Phase 13C) ─────────────────────────
 
   /** Aktueller Pixel-X für die Darstellung (interpoliert). */

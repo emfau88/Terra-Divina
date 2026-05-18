@@ -43,6 +43,10 @@ export const BALANCE = {
   WAR_DURATION_TICKS:        120,    // Krieg dauert ~120 Village-Ticks
   TRUCE_DURATION_TICKS:      60,     // Waffenstillstand dauert ~60 Village-Ticks
 
+  // Phase Hunger-Fix — starting food per faction
+  STARTING_FOOD_DEFAULT: 24,
+  STARTING_FOOD_ORC:     34,   // +42% — Orks wachsen schnell, brauchen mehr Startvorrat
+
   // Phase VFX — FireSystem
   FIRE_SPREAD_INTERVAL_MS: 700,    // ms zwischen Spread-Ticks
   FIRE_BURN_MIN:            7,     // min Burn-Ticks bevor → Asche

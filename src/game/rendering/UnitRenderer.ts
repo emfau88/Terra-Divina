@@ -88,5 +88,11 @@ export class UnitRenderer {
       g.fillStyle(0xffe28a, 0.9);
       g.fillCircle(px + 6, py - 6, 2.5);
     }
+
+    // Hunger-Indikator: oranges Ausrufezeichen-Punkt über der Einheit
+    if (u.isStarving) {
+      g.fillStyle(0xff9944, 1.0);
+      g.fillCircle(px - 6, py - 13, 2.5);
+    }
   }
 }

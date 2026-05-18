@@ -19,6 +19,7 @@ import { WorldGenerator }    from '@game/world/WorldGenerator';
 import { TileType }          from '@game/world/TileTypes';
 import { COLS, ROWS }        from '@game/config';
 import { BuildingType }      from '@game/data/buildingDefs';
+import { BALANCE }           from '@game/data/balance';
 
 export class VillageManager {
   readonly villages: Partial<Record<FactionKey, Village>> = {};
@@ -67,6 +68,8 @@ export class VillageManager {
 
   private createVillage(faction: FactionKey, x: number, y: number): void {
     const v = new Village(faction, x, y);
+    // Fraktions-spezifischer Startvorrat (Orks wachsen schnell → mehr Startnahrung)
+    v.food = faction === 'orc' ? BALANCE.STARTING_FOOD_ORC : BALANCE.STARTING_FOOD_DEFAULT;
     this.villages[faction] = v;
 
     this.addBuilding(faction, 'hall',  x,     y);

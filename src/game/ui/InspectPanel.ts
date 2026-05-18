@@ -174,13 +174,16 @@ export class InspectPanel {
 
   private unitBody(u: Unit): string {
     const hpBar = this.bar(u.hp, u.maxHp, 14);
+    const statusLine = u.isStarving
+      ? 'Status  Verhungert ⚠'
+      : `Staat   ${u.state}`;
     return [
-      `HP    ${u.hp}/${u.maxHp}  ${hpBar}`,
-      `Rolle ${this.roleName(u.role)}`,
-      `Staat ${u.state}`,
-      `Pos   (${u.x}, ${u.y})`,
+      `HP      ${u.hp}/${u.maxHp}  ${hpBar}`,
+      `Rolle   ${this.roleName(u.role)}`,
+      statusLine,
+      `Pos     (${u.x}, ${u.y})`,
       u.carryFood + u.carryWood > 0
-        ? `Trägt F${u.carryFood}  H${u.carryWood}`
+        ? `Trägt   F${u.carryFood}  H${u.carryWood}`
         : '',
     ].filter(Boolean).join('\n');
   }
@@ -195,14 +198,18 @@ export class InspectPanel {
   }
 
   private villageBody(v: Village): string {
-    const pop = this.units.liveCount(v.faction as 'human' | 'orc');
+    const pop    = this.units.liveCount(v.faction as 'human' | 'orc');
+    const supply = v.food <= 0
+      ? 'Versorgung  Verhungernd ⚠'
+      : `Versorgung  Stabil`;
     return [
-      `Level    ${v.level}`,
-      `Pop      ${pop}`,
-      `Nahrung  ${Math.floor(v.food)}`,
-      `Holz     ${Math.floor(v.wood)}`,
-      `Hunger   ${v.hunger.toFixed(1)}`,
-      `Gebäude  ${v.buildings.length}`,
+      `Level       ${v.level}`,
+      `Pop         ${pop}`,
+      `Nahrung     ${Math.floor(v.food)}`,
+      supply,
+      `Holz        ${Math.floor(v.wood)}`,
+      `Hunger      ${v.hunger.toFixed(1)}`,
+      `Gebäude     ${v.buildings.length}`,
     ].join('\n');
   }
 

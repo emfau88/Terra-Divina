@@ -146,6 +146,22 @@ export class GameScene extends Phaser.Scene {
       ui?.showResult(state === 'won');
     };
 
+    // 5c. HungerSystem — EventFeed-Callback und Tages-Synchronisation
+    this.hungerSystem.onFeedEvent = (evt) => {
+      const fc = FACTIONS[evt.faction];
+      switch (evt.kind) {
+        case 'empty':
+          this.eventFeed.push(`${fc.name} Dorf hat keinen Vorrat mehr`, '#ff9944');
+          break;
+        case 'starving':
+          this.eventFeed.push(`${fc.name} Einheiten verhungern`, '#ff9944');
+          break;
+        case 'recovered':
+          this.eventFeed.push(`${fc.name} Vorrat erholt`, '#64d987');
+          break;
+      }
+    };
+
     // 6. Callbacks
     this.resourceSystem.onSpawn = (faction) => {
       this.unitRenderer.drawAll(this.unitManager.liveUnits);
@@ -365,6 +381,8 @@ export class GameScene extends Phaser.Scene {
     if (this.dayAccum >= this.DAY_INTERVAL_MS) {
       this.dayAccum = 0;
       this.goalSystem.addDay(this.villageManager, this.unitManager);
+      // Tages-Zähler an HungerSystem weitergeben (Gnadenfrist-Tracking)
+      this.hungerSystem.currentDay = this.goalSystem.day;
       this.pushHudUpdate();
     }
 
