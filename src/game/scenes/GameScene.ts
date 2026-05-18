@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import { CANVAS_W, WORLD_Y, WORLD_H, TILE, COLS, ROWS, ZOOM_DEFAULT } from '@game/config';
+// Geschwindigkeit der visuellen Interpolation in Pixel pro Millisekunde (Phase 13C)
+const VISUAL_SPEED_PX_PER_MS = 150 / 1000;
 import { WorldGrid }          from '@game/world/WorldGrid';
 import { WorldGenerator }     from '@game/world/WorldGenerator';
 import { WorldRenderer }      from '@game/rendering/WorldRenderer';
@@ -284,12 +286,47 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
+    // ─── Visuelle Einheiten-Interpolation (Phase 13C) ──────────────────────
+    // Jeden Frame: visuelle Position sanft zum logischen Kachel-Mittelpunkt bewegen.
+    // Kein Eingriff in UnitAI — die KI kann beliebig viele Ticks vorausschreiten.
+    {
+      const maxStep = VISUAL_SPEED_PX_PER_MS * delta;
+      let anyMoving = false;
+      for (const u of this.unitManager.liveUnits) {
+        // Logischer Zielpixel dieser Einheit
+        const targetX = u.x * TILE + TILE / 2;
+        const targetY = u.y * TILE + TILE / 2;
+        const dx = targetX - u.visualX;
+        const dy = targetY - u.visualY;
+        const distPx = Math.hypot(dx, dy);
+        if (distPx > 0.5) {
+          anyMoving = true;
+          // Einheit noch nicht am Ziel — interpolieren
+          if (distPx <= maxStep) {
+            // Ziel in diesem Frame erreichbar — einrasten
+            u.visualX = targetX;
+            u.visualY = targetY;
+          } else {
+            // Einen Schritt in Richtung Ziel bewegen
+            const ratio = maxStep / distPx;
+            u.visualX += dx * ratio;
+            u.visualY += dy * ratio;
+          }
+        }
+      }
+      // Einheiten-Grafik neu zeichnen wenn sich mindestens eine Einheit bewegt
+      if (anyMoving) {
+        this.unitRenderer.drawAll(this.unitManager.liveUnits);
+      }
+    }
+
     // AI + Hunger
     if (this.aiAccum >= this.AI_INTERVAL_MS) {
       this.aiAccum = 0;
       this.clock.tick();
       this.unitManager.tick(1);
       this.hungerSystem.tick(1);
+      // Einheitenpositionen haben sich geändert — sofort neu zeichnen
       this.unitRenderer.drawAll(this.unitManager.liveUnits);
       this.inspectPanel.refresh();
       this.eventFeed.update();

@@ -12,7 +12,6 @@
 import Phaser from 'phaser';
 import { Unit }      from '@game/units/Unit';
 import { FACTIONS }  from '@game/factions/Faction';
-import { TILE }      from '@game/config';
 
 export class UnitRenderer {
   private readonly g: Phaser.GameObjects.Graphics;
@@ -34,8 +33,9 @@ export class UnitRenderer {
   private drawUnit(u: Unit): void {
     const g  = this.g;
     const fc = FACTIONS[u.faction];
-    const px = u.x * TILE + TILE / 2;
-    const py = u.y * TILE + TILE / 2;
+    // Visuelle Pixel-Position verwenden (interpoliert) statt Kachel-Umrechnung
+    const px = u.visualX;
+    const py = u.visualY;
 
     // Boden-Schatten
     g.fillStyle(0x000000, 0.25);
