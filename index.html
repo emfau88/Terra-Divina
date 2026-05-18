@@ -18,34 +18,87 @@
 
   <script type="module" src="/src/main.ts"></script>
 
-  <!-- Hauptmenü: wird beim Start angezeigt, Uhr startet erst nach Modusauswahl -->
+  <!-- ═══════════════════════════════════════════════════════════
+       HAUPTMENÜ
+       Füllt den gesamten Viewport. Kein eingebettetes Setup-Panel.
+  ═══════════════════════════════════════════════════════════ -->
   <div id="main-menu">
-    <div id="menu-box">
-      <div id="menu-title">Terra Divina</div>
-      <div id="menu-subtitle">Eine lebendige Welt erwartet dich.</div>
-      <div class="menu-buttons">
+    <div id="menu-inner">
+
+      <!-- Kopfbereich: Logo + Titel -->
+      <div id="menu-header">
+        <div id="menu-title">Terra Divina</div>
+        <div id="menu-subtitle">Eine lebendige Welt erwartet dich.</div>
+      </div>
+
+      <!-- Hauptaktionen -->
+      <div class="menu-buttons" id="menu-actions">
         <button class="menu-btn menu-btn--disabled" id="btn-continue" disabled>
           <span class="menu-btn-icon">📖</span>
-          <span class="menu-btn-label">Fortsetzen</span>
-          <span class="menu-btn-sub">Kein Spielstand vorhanden</span>
+          <div class="menu-btn-text">
+            <span class="menu-btn-label">Fortsetzen</span>
+            <span class="menu-btn-sub">Kein Spielstand vorhanden</span>
+          </div>
         </button>
+
         <button class="menu-btn menu-btn--primary" id="btn-new-world">
           <span class="menu-btn-icon">🌍</span>
-          <span class="menu-btn-label">Neue Welt</span>
-          <span class="menu-btn-sub">Freies Sandbox-Spiel</span>
+          <div class="menu-btn-text">
+            <span class="menu-btn-label">Neue Welt</span>
+            <span class="menu-btn-sub">Freies Sandbox-Spiel</span>
+          </div>
         </button>
+
         <button class="menu-btn" id="btn-scenario">
           <span class="menu-btn-icon">⚔</span>
-          <span class="menu-btn-label">Szenario: 30 Tage</span>
-          <span class="menu-btn-sub">Hilf der Welt zu überleben</span>
+          <div class="menu-btn-text">
+            <span class="menu-btn-label">Szenario</span>
+            <span class="menu-btn-sub">30 Tage überleben</span>
+          </div>
         </button>
+
         <button class="menu-btn menu-btn--secondary" id="btn-options">
           <span class="menu-btn-icon">⚙</span>
-          <span class="menu-btn-label">Optionen</span>
-          <span class="menu-btn-sub"></span>
+          <div class="menu-btn-text">
+            <span class="menu-btn-label">Optionen</span>
+            <span class="menu-btn-sub"></span>
+          </div>
         </button>
       </div>
-      <div id="setup-panel" class="hidden">
+
+      <!-- Optionen-Panel (inline, klappt ein/aus) -->
+      <div id="options-panel" class="hidden">
+        <div class="options-row">
+          <span class="options-label">Vollbild</span>
+          <button class="dock-btn" id="btn-menu-fullscreen">Aktivieren</button>
+        </div>
+        <div class="options-version">Terra Divina — v0.20</div>
+      </div>
+
+      <!-- Fußzeile mit Vollbild-Hinweis -->
+      <div id="menu-footer">
+        <button id="btn-menu-fs-hint" class="menu-fs-hint">
+          ⛶ Vollbild empfohlen
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SETUP-SCREEN — eigenständiger Overlay-Screen
+       Wird von MainMenuScene geöffnet/geschlossen.
+  ═══════════════════════════════════════════════════════════ -->
+  <div id="setup-screen" class="hidden">
+    <div id="setup-screen-inner">
+
+      <div class="screen-header">
+        <button class="screen-back-btn" id="btn-setup-back">← Zurück</button>
+        <h2 class="screen-title">Neue Welt</h2>
+      </div>
+
+      <div class="screen-body">
+
         <div class="setup-section">
           <div class="setup-label">Weltgröße</div>
           <div class="setup-row" id="setup-size">
@@ -53,6 +106,7 @@
             <button class="setup-btn" data-value="small">Klein</button>
           </div>
         </div>
+
         <div class="setup-section">
           <div class="setup-label">Welttyp</div>
           <div class="setup-row" id="setup-type">
@@ -62,6 +116,7 @@
             <button class="setup-btn" data-value="mountain">Berge</button>
           </div>
         </div>
+
         <div class="setup-section">
           <div class="setup-label">Startmodus</div>
           <div class="setup-row" id="setup-mode">
@@ -71,48 +126,60 @@
             <button class="setup-btn" data-value="chaos">Chaos</button>
           </div>
         </div>
+
         <div class="setup-section">
           <div class="setup-label">Völker</div>
           <div class="setup-row setup-row--factions" id="setup-factions">
-            <button class="setup-btn setup-btn--faction active" data-faction="human" style="color:#5ec8ff">Menschen</button>
-            <button class="setup-btn setup-btn--faction active" data-faction="orc"   style="color:#ff5d63">Orks</button>
-            <button class="setup-btn setup-btn--faction active" data-faction="elf"   style="color:#6dff8a">Elfen</button>
-            <button class="setup-btn setup-btn--faction active" data-faction="dwarf" style="color:#d4a04a">Zwerge</button>
+            <button class="setup-btn setup-btn--faction active" data-faction="human"  style="color:#5ec8ff">Menschen</button>
+            <button class="setup-btn setup-btn--faction active" data-faction="orc"    style="color:#ff5d63">Orks</button>
+            <button class="setup-btn setup-btn--faction active" data-faction="elf"    style="color:#6dff8a">Elfen</button>
+            <button class="setup-btn setup-btn--faction active" data-faction="dwarf"  style="color:#d4a04a">Zwerge</button>
           </div>
         </div>
+
         <div class="setup-section setup-seed-row">
           <div class="setup-label">Seed</div>
           <div class="setup-seed-value" id="setup-seed-display">123456</div>
-          <button class="setup-btn" id="btn-reseed">🔀</button>
+          <button class="setup-btn" id="btn-reseed">🔀 Neu</button>
         </div>
-        <button class="menu-btn menu-btn--primary" id="btn-start-game" style="margin-top:8px">
+
+      </div><!-- /.screen-body -->
+
+      <div class="screen-footer">
+        <button class="menu-btn menu-btn--primary" id="btn-start-game">
           <span class="menu-btn-icon">▶</span>
-          <span class="menu-btn-label">Welt starten</span>
-          <span class="menu-btn-sub"></span>
+          <div class="menu-btn-text">
+            <span class="menu-btn-label">Welt starten</span>
+            <span class="menu-btn-sub"></span>
+          </div>
         </button>
       </div>
-      <!-- Szenario-Panel: Liste der wählbaren Szenarien -->
-      <div id="scenario-panel" class="hidden">
-        <div class="setup-label" style="font-size:14px;margin-bottom:8px">Szenario wählen</div>
+
+    </div><!-- /#setup-screen-inner -->
+  </div><!-- /#setup-screen -->
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SZENARIO-SCREEN — eigenständiger Overlay-Screen
+  ═══════════════════════════════════════════════════════════ -->
+  <div id="scenario-screen" class="hidden">
+    <div id="scenario-screen-inner">
+
+      <div class="screen-header">
+        <button class="screen-back-btn" id="btn-scenario-back">← Zurück</button>
+        <h2 class="screen-title">Szenario wählen</h2>
+      </div>
+
+      <div class="screen-body">
         <!-- Wird dynamisch von MainMenuScene befüllt -->
         <div id="scenario-list"></div>
-        <button class="menu-btn menu-btn--secondary" id="btn-scenario-back" style="margin-top:8px">
-          <span class="menu-btn-icon">←</span>
-          <span class="menu-btn-label">Zurück</span>
-          <span class="menu-btn-sub"></span>
-        </button>
       </div>
-      <div id="options-panel" class="hidden">
-        <div class="options-row">
-          <span class="options-label">Vollbild</span>
-          <button class="dock-btn" id="btn-menu-fullscreen">Aktivieren</button>
-        </div>
-        <div class="options-version">Terra Divina — v0.15</div>
-      </div>
+
     </div>
   </div>
 
-  <!-- Ergebnis-Overlay: erscheint nach Sieg oder Niederlage -->
+  <!-- ═══════════════════════════════════════════════════════════
+       ERGEBNIS-OVERLAY
+  ═══════════════════════════════════════════════════════════ -->
   <div id="result-overlay" class="hidden">
     <div id="result-box">
       <h2 id="result-title"></h2>
@@ -120,5 +187,11 @@
       <button id="btn-result-action"></button>
     </div>
   </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       KATEGORIE-HINT TOAST (kurzer Hinweis beim Tab-Wechsel)
+  ═══════════════════════════════════════════════════════════ -->
+  <div id="category-hint" class="hidden" aria-live="polite"></div>
+
 </body>
 </html>
