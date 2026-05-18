@@ -23,6 +23,13 @@ export class CombatSystem {
   /** Callback der nach jedem Treffer im Einheit-vs-Einheit-Kampf ausgelöst wird (Phase 13E). */
   onHit: ((px: number, py: number) => void) | null = null;
 
+  /**
+   * Callback der ausgelöst wird wenn eine Einheit durch eine andere Einheit getötet wird.
+   * Nur für Einheit-vs-Einheit-Kämpfe — nicht für Hunger/Feuer-Tode.
+   * Parameter: (attacker, defender) — beide noch nicht aus dem Array entfernt.
+   */
+  onKill: ((attacker: Unit, defender: Unit) => void) | null = null;
+
   constructor(villages: VillageManager) {
     this.villages = villages;
   }
@@ -39,6 +46,8 @@ export class CombatSystem {
       defender.hp    = 0;
       defender.dead  = true;
       defender.state = 'wounded';
+      // onKill-Callback für EventFeed-Todesmeldungen auslösen (AI-Fix)
+      this.onKill?.(attacker, defender);
     } else {
       defender.state = 'fight';
     }

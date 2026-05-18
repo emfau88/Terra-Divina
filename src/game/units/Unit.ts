@@ -80,6 +80,19 @@ export class Unit {
   /** Treffer-Flash Timer in ms — Einheit wird weiß/gelb dargestellt wenn > 0. */
   hitFlash: number = 0;
 
+  // ─── Ziel-Persistenz (Phase AI-Fix) ──────────────────────────────────────
+
+  /** Persistentes Bewegungsziel (Kachel-Koordinaten) für wandernde Einheiten. */
+  targetX: number = 0;
+  targetY: number = 0;
+
+  /**
+   * Verbleibende Ticks für das aktuelle Ziel.
+   * > 0 → Einheit hält das aktuelle Ziel und nimmt kein neues an.
+   * = 0 → Einheit wählt beim nächsten Wandern ein neues Ziel.
+   */
+  persistTicks: number = 0;
+
   constructor(faction: FactionKey, role: UnitRole, x: number, y: number) {
     this.id      = nextUnitId++;
     this.faction = faction;

@@ -148,9 +148,10 @@ export class UnitAI {
   // ─── Gatherer ────────────────────────────────────────────────────────────
 
   private gathererAI(u: Unit, allUnits: Unit[]): void {
-    // Nahkampf-Selbstverteidigung
+    // Nahkampf-Selbstverteidigung — Kampf ist reaktiv, ignoriert persistTicks
     const threat = this.combat.nearestEnemy(u, allUnits, 2);
     if (threat) {
+      u.persistTicks = 0; // Kampf bricht Ziel-Persistenz
       if (dist(u.x, u.y, threat.x, threat.y) <= 1.5) {
         this.combat.fight(u, threat);
       } else {
@@ -161,13 +162,14 @@ export class UnitAI {
 
     // Voll beladen → nach Hause
     if (u.carryFood + u.carryWood >= 3) {
+      u.persistTicks = 0;
       this.returnHome(u);
       return;
     }
 
     u.state = 'wander';
     // ResourceSystem übernimmt das eigentliche Sammeln
-    this.wanderNearHome(u, 8);
+    this.wanderNearHome(u, 8, BALANCE.PERSIST_GATHERER_MIN, BALANCE.PERSIST_GATHERER_MAX);
   }
 
   // ─── Builder ─────────────────────────────────────────────────────────────
@@ -176,19 +178,22 @@ export class UnitAI {
     // Nicht kämpfen — Gefahr → fliehen
     const threat = this.combat.nearestEnemy(u, allUnits, 4);
     if (threat) {
+      u.persistTicks = 0;
       u.state = 'flee';
       this.retreatHome(u);
       return;
     }
 
     if (u.carryFood + u.carryWood >= 2) {
+      u.persistTicks = 0;
       this.returnHome(u);
       return;
     }
 
-    // Beschädigtes Gebäude reparieren
+    // Beschädigtes Gebäude reparieren — eigenes Ziel, kein Wander-Persist
     const damaged = this.combat.nearestDamagedFriendly(u, 10);
     if (damaged) {
+      u.persistTicks = 0; // Reparatur überschreibt Ziel-Persistenz
       if (dist(u.x, u.y, damaged.x, damaged.y) <= 1.5) {
         u.state  = 'repair';
         damaged.hp = Math.min(damaged.maxHp, damaged.hp + 4);
@@ -200,7 +205,7 @@ export class UnitAI {
     }
 
     u.state = 'wander';
-    this.wanderNearHome(u, 7);
+    this.wanderNearHome(u, 7, BALANCE.PERSIST_BUILDER_MIN, BALANCE.PERSIST_BUILDER_MAX);
   }
 
   // ─── Guard ───────────────────────────────────────────────────────────────
@@ -209,9 +214,10 @@ export class UnitAI {
     const v = this.villages.villages[u.faction];
     if (!v) return;
 
-    // Feind in der Nähe? → angreifen
+    // Feind in der Nähe? → angreifen (reaktiv, ignoriert persistTicks)
     const enemy = this.combat.nearestEnemy(u, allUnits, 9);
     if (enemy) {
+      u.persistTicks = 0;
       if (dist(u.x, u.y, enemy.x, enemy.y) <= 1.5) {
         this.combat.fight(u, enemy);
       } else {
@@ -221,23 +227,28 @@ export class UnitAI {
       return;
     }
 
-    // Patrouille: zwischen Outpost und Dorfmitte
+    // Patrouille: zwischen Outpost und Dorfmitte — mit Persistenz
     const outpost = this.villages.buildings.find(
       b => !b.dead && b.faction === u.faction && b.type === 'outpost',
     );
     const patrol = outpost ?? v;
 
-    if (!u.target || (u.x === u.target.x && u.y === u.target.y) || u.think <= 0) {
-      // Abwechselnd Dorfmitte ↔ Outpost/Patrol
+    // Persistenz-gesteuertes Ziel: nur neues Ziel wenn persistTicks abgelaufen
+    // oder Ziel bereits erreicht (< 1.5 Kacheln)
+    const atTarget = dist(u.x, u.y, u.targetX, u.targetY) < 1.5;
+    if (u.persistTicks <= 0 || atTarget) {
       const goToVillage = Math.random() < 0.5 || !outpost;
-      u.target = goToVillage
-        ? { x: v.x + randi(-2, 2), y: v.y + randi(-2, 2) }
-        : { x: patrol.x + randi(-3, 3), y: patrol.y + randi(-3, 3) };
-      u.think  = randi(6, 14);
-      u.state  = 'patrol';
+      u.targetX = goToVillage
+        ? v.x + randi(-2, 2)
+        : patrol.x + randi(-3, 3);
+      u.targetY = goToVillage
+        ? v.y + randi(-2, 2)
+        : patrol.y + randi(-3, 3);
+      u.persistTicks = randi(BALANCE.PERSIST_GUARD_MIN, BALANCE.PERSIST_GUARD_MAX);
+      u.state = 'patrol';
     }
-    u.think--;
-    this.stepToward(u, u.target.x, u.target.y);
+    u.persistTicks--;
+    this.stepToward(u, u.targetX, u.targetY);
   }
 
   // ─── Raider ──────────────────────────────────────────────────────────────
@@ -247,11 +258,12 @@ export class UnitAI {
     if (!v) return;
 
     // Im Frieden / bei Anspannung: Raider erkunden in größerem Radius
-    // Peace:   13 Kacheln (war: 5) — macht Raider sichtbar aktiv
+    // Peace:   13 Kacheln — macht Raider sichtbar aktiv
     // Tension: 20 Kacheln — nähert sich feindlichem Gebiet
     if (!this.isWar) {
       const threat = this.combat.nearestEnemy(u, allUnits, 3);
       if (threat && dist(u.x, u.y, threat.x, threat.y) <= 1.5) {
+        u.persistTicks = 0;
         this.combat.fight(u, threat);
         return;
       }
@@ -259,39 +271,32 @@ export class UnitAI {
         ? BALANCE.RAIDER_WANDER_TENSION   // 20 Kacheln bei Anspannung
         : BALANCE.RAIDER_WANDER_PEACE;    // 13 Kacheln im Frieden
       u.state = 'scout';
-      this.wanderNearHome(u, wanderRadius);
+      this.wanderNearHome(u, wanderRadius, BALANCE.PERSIST_SCOUT_MIN, BALANCE.PERSIST_SCOUT_MAX);
       return;
     }
 
     const aggrRadius = Math.round(6 * FACTION_TRAITS[u.faction].raiderAggrMult);
     const enemy = this.combat.nearestEnemy(u, allUnits, aggrRadius);
 
-    // Nahkampf: feindliche Einheit
+    // Nahkampf: feindliche Einheit — reaktiv
     if (enemy && dist(u.x, u.y, enemy.x, enemy.y) <= 1.5) {
+      u.persistTicks = 0;
       this.combat.fight(u, enemy);
       return;
     }
 
-    // Feind in Sichtweite verfolgen
+    // Feind in Sichtweite verfolgen — kurze Unterbrechung der Persistenz
     if (enemy) {
+      u.persistTicks = 0;
       u.state = 'march';
       this.stepToward(u, enemy.x, enemy.y);
       return;
     }
 
-    // Kein Feind in Nähe → zum feindlichen Dorf marschieren
-    // Wählt eine zufällige feindliche Fraktion, die noch ein Dorf hat
-    const enemyFactions = FACTION_KEYS.filter(
-      k => k !== u.faction && this.villages.villages[k] !== undefined,
-    );
-    if (enemyFactions.length === 0) return;
-    const enemyFaction: FactionKey = enemyFactions[Math.floor(Math.random() * enemyFactions.length)];
-    const ev = this.villages.villages[enemyFaction];
-    if (!ev) return;
-
-    // Feindliches Gebäude in Reichweite angreifen
+    // Feindliches Gebäude in Reichweite angreifen — reaktiv
     const targetBuilding = this.combat.nearestEnemyBuilding(u, 3);
     if (targetBuilding) {
+      u.persistTicks = 0;
       if (dist(u.x, u.y, targetBuilding.x, targetBuilding.y) <= 1.5) {
         this.combat.attackBuilding(u, targetBuilding);
       } else {
@@ -301,16 +306,48 @@ export class UnitAI {
       return;
     }
 
-    // Zum feindlichen Dorf marschieren
-    u.state = 'march';
-    const tx = ev.x + randi(-3, 3);
-    const ty = ev.y + randi(-3, 3);
-    if (!u.target || u.think <= 0) {
-      u.target = { x: tx, y: ty };
-      u.think  = randi(8, 18);
+    // Kein Feind in Nähe → zum feindlichen Dorf marschieren mit Persistenz
+    const atTarget = dist(u.x, u.y, u.targetX, u.targetY) < 1.5;
+    if (u.persistTicks <= 0 || atTarget) {
+      // Wählt eine zufällige feindliche Fraktion, die noch ein Dorf hat
+      const enemyFactions = FACTION_KEYS.filter(
+        k => k !== u.faction && this.villages.villages[k] !== undefined,
+      );
+      if (enemyFactions.length === 0) return;
+      const enemyFaction: FactionKey = enemyFactions[Math.floor(Math.random() * enemyFactions.length)];
+      const ev = this.villages.villages[enemyFaction];
+      if (!ev) return;
+
+      u.targetX = ev.x + randi(-3, 3);
+      u.targetY = ev.y + randi(-3, 3);
+      u.persistTicks = randi(BALANCE.PERSIST_MARCH_MIN, BALANCE.PERSIST_MARCH_MAX);
+      u.state = 'march';
+
+      // ─── Raider-Gruppen-Koordination ───────────────────────────────────
+      // Nahe Raider derselben Fraktion (die nicht kämpfen) zum selben Ziel ziehen
+      let groupCount = 0;
+      for (const ally of allUnits) {
+        if (groupCount >= BALANCE.RAIDER_GROUP_MAX - 1) break;
+        if (
+          ally.id !== u.id &&
+          ally.faction === u.faction &&
+          ally.role === 'raider' &&
+          !ally.dead &&
+          ally.state !== 'fight' && ally.state !== 'raid' && ally.state !== 'siege' &&
+          dist(u.x, u.y, ally.x, ally.y) < BALANCE.RAIDER_GROUP_RADIUS
+        ) {
+          ally.targetX      = u.targetX;
+          ally.targetY      = u.targetY;
+          ally.persistTicks = BALANCE.RAIDER_GROUP_PERSIST;
+          ally.state        = 'march';
+          groupCount++;
+        }
+      }
     }
-    u.think--;
-    this.stepToward(u, u.target.x, u.target.y);
+
+    u.persistTicks--;
+    u.state = 'march';
+    this.stepToward(u, u.targetX, u.targetY);
   }
 
   // ─── Hilfsbewegungen ────────────────────────────────────────────────────
@@ -328,19 +365,39 @@ export class UnitAI {
     this.stepToward(u, v.x, v.y);
   }
 
-  private wanderNearHome(u: Unit, radius: number): void {
+  /**
+   * Ziel-persistentes Wandern in der Nähe des Heimatdorfes.
+   *
+   * Wählt ein neues Ziel nur wenn:
+   * - persistTicks auf 0 gefallen ist, ODER
+   * - die Einheit das aktuelle Ziel fast erreicht hat (< 1.5 Kacheln).
+   *
+   * @param persistMin  Untergrenze der Persistenz-Ticks für dieses Ziel
+   * @param persistMax  Obergrenze der Persistenz-Ticks für dieses Ziel
+   */
+  private wanderNearHome(
+    u: Unit,
+    radius: number,
+    persistMin: number,
+    persistMax: number,
+  ): void {
     const v = this.villages.villages[u.faction];
     if (!v) return;
 
-    if (!u.target || u.think <= 0 || (u.x === u.target.x && u.y === u.target.y)) {
-      u.target = {
-        x: v.x + randi(-radius, radius),
-        y: v.y + randi(-radius, radius),
-      };
-      u.think = randi(3, 8);
+    // Ziel beibehalten solange persistTicks > 0 und Ziel noch nicht erreicht
+    const atTarget = dist(u.x, u.y, u.targetX, u.targetY) < 1.5;
+    if (u.persistTicks > 0 && !atTarget) {
+      u.persistTicks--;
+      this.stepToward(u, u.targetX, u.targetY);
+      return;
     }
-    u.think--;
-    this.stepToward(u, u.target.x, u.target.y);
+
+    // Neues Ziel wählen
+    u.targetX      = v.x + randi(-radius, radius);
+    u.targetY      = v.y + randi(-radius, radius);
+    u.persistTicks = randi(persistMin, persistMax);
+    u.persistTicks--;
+    this.stepToward(u, u.targetX, u.targetY);
   }
 
   // ─── Bewegungs-Kernel ────────────────────────────────────────────────────

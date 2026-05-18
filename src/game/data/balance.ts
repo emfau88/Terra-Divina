@@ -68,6 +68,27 @@ export const BALANCE = {
   SCENARIO_TENSION_MULT:       2.0,  // Nur in gameMode === 'scenario' aktiv
   SCENARIO_WAR_THRESHOLD:      55,   // Niedrigere Kriegsschwelle im Szenario (statt 80)
 
+  // ─── Ziel-Persistenz (AI-Fix) ─────────────────────────────────────────────
+  // Wie viele AI-Ticks eine Einheit ihr Ziel beibehält, bevor sie ein neues wählt.
+  PERSIST_GATHERER_MIN:  20,   // Sammler: 20–30 Ticks
+  PERSIST_GATHERER_MAX:  30,
+  PERSIST_BUILDER_MIN:   25,   // Baumeister: 25–35 Ticks
+  PERSIST_BUILDER_MAX:   35,
+  PERSIST_GUARD_MIN:     15,   // Wache: 15–20 Ticks (reaktiver)
+  PERSIST_GUARD_MAX:     20,
+  PERSIST_SCOUT_MIN:     25,   // Raider (Frieden/Erkundung): 25–40 Ticks
+  PERSIST_SCOUT_MAX:     40,
+  PERSIST_MARCH_MIN:     40,   // Raider (Krieg/Marsch): 40–60 Ticks (sehr ausdauernd)
+  PERSIST_MARCH_MAX:     60,
+
+  // ─── Raider-Gruppen-Koordination (AI-Fix) ─────────────────────────────────
+  RAIDER_GROUP_RADIUS:   8,    // Kacheln — Raider in diesem Radius werden in die Gruppe gezogen
+  RAIDER_GROUP_MAX:      3,    // Maximale Gruppengröße (zieht max. 2 weitere Raider)
+  RAIDER_GROUP_PERSIST:  45,   // Persistenz-Ticks für mitgezogene Gruppen-Raider
+
+  // ─── Kampftod-EventFeed (AI-Fix) ──────────────────────────────────────────
+  DEATH_EVENT_COOLDOWN_MS: 5000,  // Globaler Mindestabstand zwischen Todesmeldungen in ms
+
   // Phase VFX — FireSystem
   FIRE_SPREAD_INTERVAL_MS: 700,    // ms zwischen Spread-Ticks
   FIRE_BURN_MIN:            7,     // min Burn-Ticks bevor → Asche

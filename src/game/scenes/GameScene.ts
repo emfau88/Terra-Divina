@@ -241,6 +241,31 @@ export class GameScene extends Phaser.Scene {
       this.effectSystem.spawnHitSpark(px, py);
     };
 
+    // Kampftod-Meldungen: CombatSystem → EventFeed (AI-Fix)
+    // Globaler Cooldown verhindert Spam in großen Schlachten.
+    let lastDeathEventMs = 0;
+    this.unitManager.getAI().combat.onKill = (attacker, defender) => {
+      // Nur bei aktiver Spannung oder Krieg relevant
+      if (!this.diplomacy.isWar && !this.diplomacy.isTension) return;
+      // Nur Fraktion-vs-Fraktion-Kills (nicht Hunger/Feuer)
+      if (attacker.faction === defender.faction) return;
+      // Globaler Cooldown — max 1 Todesmeldung alle DEATH_EVENT_COOLDOWN_MS
+      const now = performance.now();
+      if (now - lastDeathEventMs < BALANCE.DEATH_EVENT_COOLDOWN_MS) return;
+      lastDeathEventMs = now;
+
+      const aFac  = FACTIONS[attacker.faction];
+      const color = '#' + aFac.color.toString(16).padStart(6, '0');
+      const roleLabel: Record<string, string> = {
+        gatherer: 'Sammler',
+        builder:  'Baumeister',
+        guard:    'Wache',
+        raider:   'Krieger',
+      };
+      const defRole = roleLabel[defender.role] ?? defender.role;
+      this.eventFeed.push(`${aFac.short} tötet ${defRole}`, color);
+    };
+
     // Sichtkontakt-Events: UnitAI → EventFeed + DiplomacySystem (Contact-Fix)
     this.unitManager.getAI().onContactEvent = (evt: ContactEvent) => {
       const spotter = FACTIONS[evt.spotter];
