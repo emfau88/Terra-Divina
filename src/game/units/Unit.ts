@@ -21,6 +21,7 @@ export type UnitState =
   | 'forage'
   | 'return'
   | 'repair'
+  | 'build'
   | 'patrol'
   | 'defend'
   | 'scout'

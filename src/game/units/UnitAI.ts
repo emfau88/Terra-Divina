@@ -179,6 +179,13 @@ export class UnitAI {
     const threat = this.combat.nearestEnemy(u, allUnits, 4);
     if (threat) {
       u.persistTicks = 0;
+      // Unassign from any build site so another builder can take over
+      const v = this.villages.villages[u.faction];
+      if (v) {
+        for (const site of v.buildSites) {
+          if (site.assignedUnitId === u.id) site.assignedUnitId = null;
+        }
+      }
       u.state = 'flee';
       this.retreatHome(u);
       return;
@@ -190,7 +197,29 @@ export class UnitAI {
       return;
     }
 
-    // Beschädigtes Gebäude reparieren — eigenes Ziel, kein Wander-Persist
+    // ── Priority 1: Walk to assigned or nearest unassigned BuildSite ─────────
+    const v = this.villages.villages[u.faction];
+    if (v && v.buildSites.length > 0) {
+      const site =
+        v.buildSites.find(s => s.assignedUnitId === u.id) ??
+        v.buildSites.find(s => s.assignedUnitId === null);
+
+      if (site) {
+        site.assignedUnitId = u.id;
+        u.persistTicks = 0;
+        if (dist(u.x, u.y, site.x, site.y) > 1.5) {
+          u.state = 'build';
+          this.stepToward(u, site.x, site.y);
+        } else {
+          // At site — wait for completion
+          u.state = 'build';
+          u.persistTicks = 3;
+        }
+        return;
+      }
+    }
+
+    // ── Priority 2: Repair damaged buildings ─────────────────────────────────
     const damaged = this.combat.nearestDamagedFriendly(u, 10);
     if (damaged) {
       u.persistTicks = 0; // Reparatur überschreibt Ziel-Persistenz

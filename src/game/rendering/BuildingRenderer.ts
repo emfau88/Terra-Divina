@@ -10,8 +10,9 @@
  */
 
 import Phaser from 'phaser';
-import { Building } from '@game/factions/Building';
-import { Village }  from '@game/factions/Village';
+import { Building }  from '@game/factions/Building';
+import { Village }   from '@game/factions/Village';
+import { BuildSite } from '@game/factions/Village';
 import { FACTIONS, FactionKey, FACTION_KEYS } from '@game/factions/Faction';
 import { TILE } from '@game/config';
 
@@ -46,6 +47,15 @@ export class BuildingRenderer {
     for (const b of buildings) {
       if (b.dead) continue;
       this.drawBuilding(b);
+    }
+
+    // Draw all active BuildSites as scaffolding
+    for (const key of FACTION_KEYS) {
+      const v = this.villages[key];
+      if (!v || v.buildSites.length === 0) continue;
+      for (const site of v.buildSites) {
+        this.drawBuildSite(site);
+      }
     }
   }
 
@@ -189,5 +199,52 @@ export class BuildingRenderer {
     g.fillRect(px + 4, py + 4, 11, 4);
     g.fillStyle(0x171717, a * 0.8);
     g.fillRect(px + 7, py + 11, 4, 5);
+  }
+
+  // ─── BuildSite Scaffold ──────────────────────────────────────────────────
+
+  /**
+   * Renders an in-progress BuildSite as a scaffold outline with a progress bar.
+   * Scaffold feel: thin border in faction color, very dark fill, small progress bar at top.
+   */
+  private drawBuildSite(site: BuildSite): void {
+    const g    = this.buildG;
+    const f    = FACTIONS[site.faction];
+    const px   = site.x * TILE;
+    const py   = site.y * TILE;
+    const size = 12; // slightly smaller than a tile
+    const ox   = (TILE - size) / 2; // center within tile
+
+    // Ground shadow (subtle)
+    this.shadowG.fillStyle(0x000000, 0.15);
+    this.shadowG.fillEllipse(px + 9, py + 14, 14, 5);
+
+    // Dark fill — 30% alpha
+    g.fillStyle(0x111111, 0.3);
+    g.fillRect(px + ox, py + ox, size, size);
+
+    // Scaffold border — faction color at 60% alpha
+    g.lineStyle(1.5, f.color, 0.6);
+    g.strokeRect(px + ox, py + ox, size, size);
+
+    // Diagonal scaffold lines (give it a construction-site feel)
+    g.lineStyle(1, f.color, 0.25);
+    g.lineBetween(px + ox,        py + ox,        px + ox + size, py + ox + size);
+    g.lineBetween(px + ox + size, py + ox,        px + ox,        py + ox + size);
+
+    // Progress bar (top of tile, above scaffold box)
+    const barW    = size;
+    const barH    = 3;
+    const barX    = px + ox;
+    const barY    = py + ox - barH - 1;
+    const progress = (site.totalTicks - site.ticksRemaining) / site.totalTicks;
+
+    // Bar background
+    g.fillStyle(0x222222, 0.8);
+    g.fillRect(barX, barY, barW, barH);
+
+    // Bar fill — faction color
+    g.fillStyle(f.color, 0.9);
+    g.fillRect(barX, barY, Math.floor(barW * progress), barH);
   }
 }

@@ -89,6 +89,9 @@ export const BALANCE = {
   // ─── Kampftod-EventFeed (AI-Fix) ──────────────────────────────────────────
   DEATH_EVENT_COOLDOWN_MS: 5000,  // Globaler Mindestabstand zwischen Todesmeldungen in ms
 
+  // ─── BuildSite-System (Village Growth Visibility) ────────────────────────
+  BUILD_SITE_TICKS: 10,            // Ticks bis ein BuildSite ein fertiges Gebäude wird
+
   // Phase VFX — FireSystem
   FIRE_SPREAD_INTERVAL_MS: 700,    // ms zwischen Spread-Ticks
   FIRE_BURN_MIN:            7,     // min Burn-Ticks bevor → Asche

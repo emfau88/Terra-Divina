@@ -21,6 +21,7 @@ import { FACTION_TRAITS }  from '@game/factions/FactionTraits';
 import { Unit }            from '@game/units/Unit';
 import { BALANCE }         from '@game/data/balance';
 import { BuildingType }    from '@game/data/buildingDefs';
+import { BuildSite }       from '@game/factions/Village';
 
 function choice<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -59,6 +60,7 @@ export class ResourceSystem {
         this.unitResourceTick(key);
         this.trySpawn(key);
         this.tryBuild(key);
+        this.tickBuildSites(key);
         this.tryLevelUp(key);
       }
     }
@@ -205,17 +207,101 @@ export class ResourceSystem {
     if (!v) return;
 
     const maxBuildings = 5 + v.level * 5;
+    // Count finished buildings + pending build sites toward cap
+    const effectiveCount = v.buildings.length + v.buildSites.length;
     if (
       v.wood  < BALANCE.BUILD_WOOD_COST ||
       v.food  < BALANCE.BUILD_FOOD_COST ||
-      v.buildings.length >= maxBuildings
+      effectiveCount >= maxBuildings
     ) return;
 
-    if (!this.growVillage(faction)) return;
+    const site = this.planBuildSite(faction);
+    if (!site) return;
 
+    // Deduct resources and register site — building placed when site completes
     v.wood -= BALANCE.BUILD_WOOD_COST;
     v.food -= BALANCE.BUILD_FOOD_COST;
+    v.buildSites.push(site);
+    // Notify renderer that something has changed (scaffold needs drawing)
     this.onBuild?.(faction);
+  }
+
+  /**
+   * Picks a building type + location (same logic as the old growVillage),
+   * validates no existing building or BuildSite is already there,
+   * and returns a new BuildSite ready to be pushed — WITHOUT placing the building.
+   */
+  private planBuildSite(faction: FactionKey): BuildSite | null {
+    const v = this.villages.villages[faction];
+    if (!v) return null;
+
+    const pool: BuildingType[] = [
+      'hut', 'farm', 'wood', 'hut', 'farm',
+      v.level >= 3 ? 'tower'    : 'hut',
+      v.level >= 2 ? 'outpost'  : 'hut',
+      v.level >= 4 ? 'barracks' : 'hut',
+    ];
+    const type   = choice(pool);
+    const radius = 4 + v.level;
+
+    const candidates: Array<{ x: number; y: number; d: number }> = [];
+    for (let yy = v.y - radius; yy <= v.y + radius; yy++) {
+      for (let xx = v.x - radius; xx <= v.x + radius; xx++) {
+        if (!this.grid.isWalkable(xx, yy)) continue;
+        if (this.villages.buildingAt(xx, yy))  continue;
+        // Also block tiles already claimed by another BuildSite
+        if (v.buildSites.some(s => s.x === xx && s.y === yy)) continue;
+        const d = dist(xx, yy, v.x, v.y);
+        if (d > radius) continue;
+        candidates.push({ x: xx, y: yy, d });
+      }
+    }
+    candidates.sort((a, b) => a.d - b.d);
+
+    if (candidates.length === 0) return null;
+
+    const p = candidates[0];
+    return {
+      x:              p.x,
+      y:              p.y,
+      type,
+      faction,
+      ticksRemaining: BALANCE.BUILD_SITE_TICKS,
+      totalTicks:     BALANCE.BUILD_SITE_TICKS,
+      assignedUnitId: null,
+    };
+  }
+
+  /**
+   * Counts down all BuildSites for a faction.
+   * When a site reaches 0, the building is placed and the site is removed.
+   * This is the FALLBACK — buildings complete even without a builder present.
+   */
+  private tickBuildSites(faction: FactionKey): void {
+    const v = this.villages.villages[faction];
+    if (!v || v.buildSites.length === 0) return;
+
+    const completed: BuildSite[] = [];
+
+    for (const site of v.buildSites) {
+      site.ticksRemaining--;
+      if (site.ticksRemaining <= 0) {
+        completed.push(site);
+      }
+    }
+
+    for (const site of completed) {
+      // Remove from buildSites array
+      const idx = v.buildSites.indexOf(site);
+      if (idx !== -1) v.buildSites.splice(idx, 1);
+
+      // Place the finished building (same as old growVillage path)
+      const b = this.villages.addBuilding(faction, site.type, site.x, site.y);
+      if (b) {
+        this.villages.makeRoads(faction);
+        this.onBuild?.(faction);
+      }
+    }
   }
 
   private tryLevelUp(faction: FactionKey): void {
@@ -225,45 +311,6 @@ export class ResourceSystem {
     v.wood -= BALANCE.LEVEL_UP_WOOD_COST;
     v.level++;
     this.onBuild?.(faction); // Neuzeichnen
-  }
-
-  // ─── Dorf wachsen lassen ─────────────────────────────────────────────────
-
-  private growVillage(faction: FactionKey): boolean {
-    const v = this.villages.villages[faction];
-    if (!v) return false;
-
-    const pool: BuildingType[] = [
-      'hut', 'farm', 'wood', 'hut', 'farm',
-      v.level >= 3 ? 'tower'    : 'hut',
-      v.level >= 2 ? 'outpost'  : 'hut',
-      v.level >= 4 ? 'barracks' : 'hut',
-    ];
-    const type = choice(pool);
-    const radius = 4 + v.level;
-
-    // Kandidaten: begehbare, freie Felder in Radius
-    const candidates: Array<{ x: number; y: number; d: number }> = [];
-    for (let yy = v.y - radius; yy <= v.y + radius; yy++) {
-      for (let xx = v.x - radius; xx <= v.x + radius; xx++) {
-        if (!this.grid.isWalkable(xx, yy)) continue;
-        if (this.villages.buildingAt(xx, yy))  continue;
-        const d = dist(xx, yy, v.x, v.y);
-        if (d > radius) continue;
-        candidates.push({ x: xx, y: yy, d });
-      }
-    }
-    // Nächste Felder bevorzugen
-    candidates.sort((a, b) => a.d - b.d);
-
-    for (const p of candidates) {
-      const b = this.villages.addBuilding(faction, type, p.x, p.y);
-      if (b) {
-        this.villages.makeRoads(faction);
-        return true;
-      }
-    }
-    return false;
   }
 
   // ─── Hilfsmethoden ───────────────────────────────────────────────────────

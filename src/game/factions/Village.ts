@@ -1,12 +1,31 @@
 /**
- * Village — Phase 4
+ * Village — Phase 4 / BuildSite
  *
  * Laufzeit-Zustand eines Dorfes.
  * Kein Phaser, kein Rendering.
  */
 
-import { FactionKey } from './Faction';
-import { Building }   from './Building';
+import { FactionKey }    from './Faction';
+import { Building }      from './Building';
+import { BuildingType }  from '@game/data/buildingDefs';
+
+// ─── BuildSite ───────────────────────────────────────────────────────────────
+
+/**
+ * Represents an in-progress construction site.
+ * Created by ResourceSystem.tryBuild(); completed by ResourceSystem.tickBuildSites().
+ * Builder units walk to the site and set state = 'build' while waiting.
+ */
+export interface BuildSite {
+  x: number;
+  y: number;
+  type: BuildingType;
+  faction: FactionKey;
+  ticksRemaining: number;
+  totalTicks: number;
+  /** Prevents multiple builders rushing the same site. null = unassigned. */
+  assignedUnitId: number | null;
+}
 
 export class Village {
   readonly faction: FactionKey;
@@ -31,6 +50,9 @@ export class Village {
 
   // ─── Gebäude-Liste ────────────────────────────────────────────────────────
   readonly buildings: Building[] = [];
+
+  // ─── Bau-Stellen (BuildSite-System) ──────────────────────────────────────
+  buildSites: BuildSite[] = [];
 
   constructor(faction: FactionKey, x: number, y: number) {
     this.faction = faction;

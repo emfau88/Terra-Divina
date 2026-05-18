@@ -566,6 +566,12 @@ export class GameScene extends Phaser.Scene {
       this.diplomacy.tick();
       this.unitManager.setWarState(this.diplomacy.isWar, this.diplomacy.isTension);
       this.pushHudUpdate();
+      // Redraw buildings every village tick when build sites are active
+      // (progress bar advances each tick — needs a redraw to show it)
+      const hasActiveSites = this.villageManager.allVillages.some(v => v.buildSites.length > 0);
+      if (hasActiveSites) {
+        this.buildingRenderer.drawAll(this.villageManager.liveBuildings);
+      }
       // Autosave bei jedem Dorf-Tick (~650 ms Spielzeit)
       this.saveGame();
     }
