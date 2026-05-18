@@ -3,29 +3,31 @@ import { GameScene } from './GameScene';
 import { SpeedIndex } from '@game/simulation/SimulationClock';
 import { GOAL_DAYS } from '@game/simulation/GoalSystem';
 import { FACTIONS } from '@game/factions/Faction';
+import { getToolIcon } from '@game/ui/toolIcons';
 
 /**
- * UIScene — Phase 21-UX
+ * UIScene — Visual Phase V1
  *
- * Kategorisierter God-Toolbox-Dock:
- *   Zerstörung | Natur | Völker | Kreaturen | Terrain | Mehr
- *
- * Nur die Werkzeuge der aktiven Kategorie werden angezeigt.
- * Beim Tab-Wechsel erscheint kurz ein Hinweis-Toast (#category-hint).
- * Pause/Speed befinden sich in der "Mehr"-Kategorie.
+ * Kategorisierter God-Toolbox-Dock mit SVG-Icons.
+ * Alle Tool- und Kategorie-Icons kommen aus dem zentralen toolIcons-Registry.
+ * Emoji werden als Fallback verwendet, falls ein Key nicht im Registry ist.
  */
 
 type CategoryKey = 'destruction' | 'nature' | 'civilizations' | 'creatures' | 'terrain' | 'more';
 
 interface ToolEntry {
   key: string;
-  icon: string;
+  /** emoji fallback — wird nur angezeigt wenn kein SVG-Icon vorhanden */
+  fallbackIcon: string;
   label: string;
 }
 
 interface CategoryDef {
   key: CategoryKey;
-  icon: string;
+  /** Icon-Key aus toolIcons.ts (cat-* Prefix) */
+  iconKey: string;
+  /** Emoji fallback für den Tab */
+  fallbackIcon: string;
   label: string;
   hint: string;
   tools: ToolEntry[];
@@ -34,70 +36,86 @@ interface CategoryDef {
 const CATEGORIES: CategoryDef[] = [
   {
     key: 'destruction',
-    icon: '💥',
+    iconKey: 'cat-destruction',
+    fallbackIcon: '💥',
     label: 'Zerstörung',
     hint: 'Blitz, Feuer und Meteor verändern die Welt mit Gewalt.',
     tools: [
-      { key: 'lightning', icon: 'ϟ',  label: 'Blitz'  },
-      { key: 'fire',      icon: '🔥', label: 'Feuer'  },
-      { key: 'meteor',    icon: '☄',  label: 'Meteor' },
+      { key: 'lightning',       fallbackIcon: 'ϟ',  label: 'Blitz'  },
+      { key: 'fire',            fallbackIcon: '🔥', label: 'Feuer'  },
+      { key: 'meteor',          fallbackIcon: '☄',  label: 'Meteor' },
     ],
   },
   {
     key: 'nature',
-    icon: '🌿',
+    iconKey: 'cat-nature',
+    fallbackIcon: '🌿',
     label: 'Natur',
     hint: 'Bringe Regen oder heile das Land.',
     tools: [
-      { key: 'rain', icon: '☔', label: 'Regen'  },
-      { key: 'heal', icon: '✚', label: 'Heilen' },
+      { key: 'rain', fallbackIcon: '☔', label: 'Regen'  },
+      { key: 'heal', fallbackIcon: '✚', label: 'Heilen' },
     ],
   },
   {
     key: 'civilizations',
-    icon: '🏘',
+    iconKey: 'cat-civilizations',
+    fallbackIcon: '🏘',
     label: 'Völker',
     hint: 'Erschaffe Zivilisationen und beobachte, wie sie wachsen.',
     tools: [
-      { key: 'human', icon: '👤', label: 'Mensch' },
-      { key: 'orc',   icon: '👹', label: 'Ork'    },
-      { key: 'elf',   icon: '🧝', label: 'Elfe'   },
-      { key: 'dwarf', icon: '⛏',  label: 'Zwerg'  },
+      { key: 'human', fallbackIcon: '👤', label: 'Mensch' },
+      { key: 'orc',   fallbackIcon: '👹', label: 'Ork'    },
+      { key: 'elf',   fallbackIcon: '🧝', label: 'Elfe'   },
+      { key: 'dwarf', fallbackIcon: '⛏',  label: 'Zwerg'  },
     ],
   },
   {
     key: 'creatures',
-    icon: '🐾',
+    iconKey: 'cat-creatures',
+    fallbackIcon: '🐾',
     label: 'Kreaturen',
     hint: 'Setze wilde Kreaturen in die Welt.',
     tools: [
-      { key: 'wolf',  icon: '🐺', label: 'Wolf'  },
-      { key: 'demon', icon: '👿', label: 'Dämon' },
+      { key: 'wolf',  fallbackIcon: '🐺', label: 'Wolf'  },
+      { key: 'demon', fallbackIcon: '👿', label: 'Dämon' },
     ],
   },
   {
     key: 'terrain',
-    icon: '🗺',
+    iconKey: 'cat-terrain',
+    fallbackIcon: '🗺',
     label: 'Terrain',
     hint: 'Male das Land neu: Gras, Wasser, Wald, Berge.',
     tools: [
-      { key: 'terrain-grass',    icon: '🟩', label: 'Gras'   },
-      { key: 'terrain-water',    icon: '🟦', label: 'Wasser' },
-      { key: 'terrain-forest',   icon: '🌲', label: 'Wald'   },
-      { key: 'terrain-mountain', icon: '⛰',  label: 'Berg'   },
-      { key: 'terrain-sand',     icon: '🟨', label: 'Sand'   },
+      { key: 'terrain-grass',    fallbackIcon: '🟩', label: 'Gras'   },
+      { key: 'terrain-water',    fallbackIcon: '🟦', label: 'Wasser' },
+      { key: 'terrain-forest',   fallbackIcon: '🌲', label: 'Wald'   },
+      { key: 'terrain-mountain', fallbackIcon: '⛰',  label: 'Berg'   },
+      { key: 'terrain-sand',     fallbackIcon: '🟨', label: 'Sand'   },
     ],
   },
   {
     key: 'more',
-    icon: '⋯',
+    iconKey: 'cat-more',
+    fallbackIcon: '⋯',
     label: 'Mehr',
     hint: 'Inspizieren, pausieren und Geschwindigkeit anpassen.',
     tools: [
-      { key: 'inspect', icon: 'ⓘ', label: 'Info' },
+      { key: 'inspect', fallbackIcon: 'ⓘ', label: 'Info' },
     ],
   },
 ];
+
+// ─── Category accent colors (used as CSS custom property on each tab) ────────
+const CAT_ACCENT: Record<CategoryKey, string> = {
+  destruction:    'var(--danger)',
+  nature:         'var(--heal)',
+  civilizations:  'var(--accent)',
+  creatures:      'var(--accent-gold)',
+  terrain:        '#8bc47a',
+  more:           'var(--muted)',
+};
 
 export class UIScene extends Phaser.Scene {
   private hudEl!:  HTMLElement;
@@ -109,9 +127,7 @@ export class UIScene extends Phaser.Scene {
   private speedBtns: HTMLButtonElement[] = [];
   private pauseBtn!: HTMLButtonElement;
 
-  /** Per-category tool grid containers, keyed by CategoryKey */
   private toolGrids = new Map<CategoryKey, HTMLElement>();
-  /** Per-category tab buttons */
   private tabBtns   = new Map<CategoryKey, HTMLButtonElement>();
 
   private hintTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -139,21 +155,32 @@ export class UIScene extends Phaser.Scene {
 
     this.hudEl.innerHTML = `
       <div class="hud-row hud-row--primary">
-        <span class="hud-label">Tag</span>
-        <span class="hud-value" id="hud-day">1 / ${GOAL_DAYS}</span>
-        <span class="hud-sep"></span>
-        <span class="hud-label">Status</span>
-        <span class="hud-value hud-status" id="hud-status">FRIEDEN</span>
+        <div class="hud-chip hud-chip--day">
+          <span class="hud-chip-label">Tag</span>
+          <span class="hud-chip-value" id="hud-day">1</span>
+        </div>
+        <div class="hud-chip hud-chip--status">
+          <span class="hud-chip-label">Status</span>
+          <span class="hud-chip-value hud-status" id="hud-status">FRIEDEN</span>
+        </div>
       </div>
       <div class="hud-row hud-row--factions">
-        <span style="color:${hex(fHum.color)}"  class="hud-faction-label">${fHum.short}</span>
-        <span class="hud-value hud-faction-val" id="hud-human" style="color:${hex(fHum.color)}">—</span>
-        <span style="color:${hex(fOrc.color)}"  class="hud-faction-label">${fOrc.short}</span>
-        <span class="hud-value hud-faction-val" id="hud-orc"   style="color:${hex(fOrc.color)}">—</span>
-        <span style="color:${hex(fElf.color)}"  class="hud-faction-label">${fElf.short}</span>
-        <span class="hud-value hud-faction-val" id="hud-elf"   style="color:${hex(fElf.color)}">—</span>
-        <span style="color:${hex(fDwarf.color)}" class="hud-faction-label">${fDwarf.short}</span>
-        <span class="hud-value hud-faction-val" id="hud-dwarf" style="color:${hex(fDwarf.color)}">—</span>
+        <div class="hud-faction-chip" style="--fc:${hex(fHum.color)}">
+          <span class="hud-faction-name">${fHum.short}</span>
+          <span class="hud-faction-val" id="hud-human">—</span>
+        </div>
+        <div class="hud-faction-chip" style="--fc:${hex(fOrc.color)}">
+          <span class="hud-faction-name">${fOrc.short}</span>
+          <span class="hud-faction-val" id="hud-orc">—</span>
+        </div>
+        <div class="hud-faction-chip" style="--fc:${hex(fElf.color)}">
+          <span class="hud-faction-name">${fElf.short}</span>
+          <span class="hud-faction-val" id="hud-elf">—</span>
+        </div>
+        <div class="hud-faction-chip" style="--fc:${hex(fDwarf.color)}">
+          <span class="hud-faction-name">${fDwarf.short}</span>
+          <span class="hud-faction-val" id="hud-dwarf">—</span>
+        </div>
       </div>
     `;
     document.body.appendChild(this.hudEl);
@@ -165,15 +192,23 @@ export class UIScene extends Phaser.Scene {
     this.dockEl = document.createElement('div');
     this.dockEl.id = 'tool-dock';
 
-    // ── Category Tab Row ────────────────────────────────────────────────────
+    // ── Category Tab Row ──────────────────────────────────────────────────
     const tabRow = document.createElement('div');
     tabRow.className = 'dock-cat-row';
 
     for (const cat of CATEGORIES) {
       const tab = document.createElement('button');
-      tab.className = 'dock-cat-btn' + (cat.key === this.activeCategoryKey ? ' active' : '');
+      const isActive = cat.key === this.activeCategoryKey;
+      tab.className = 'dock-cat-btn' + (isActive ? ' active' : '');
       tab.setAttribute('aria-label', cat.label);
-      tab.innerHTML = `<span class="cat-icon">${cat.icon}</span><span class="cat-label">${cat.label}</span>`;
+      tab.style.setProperty('--cat-accent', CAT_ACCENT[cat.key]);
+
+      const svgIcon = getToolIcon(cat.iconKey);
+      const iconHtml = svgIcon
+        ? `<span class="cat-icon cat-icon--svg">${svgIcon}</span>`
+        : `<span class="cat-icon">${cat.fallbackIcon}</span>`;
+
+      tab.innerHTML = `${iconHtml}<span class="cat-label">${cat.label}</span>`;
       tab.addEventListener('pointerdown', (e) => {
         e.stopPropagation();
         this.switchCategory(cat.key);
@@ -182,28 +217,21 @@ export class UIScene extends Phaser.Scene {
       tabRow.appendChild(tab);
     }
 
-    // ── Tool Grids (one per category, only active is shown) ─────────────────
+    // ── Tool Grids ────────────────────────────────────────────────────────
     const toolArea = document.createElement('div');
     toolArea.className = 'dock-tool-area';
 
     for (const cat of CATEGORIES) {
       const grid = document.createElement('div');
       grid.className = 'dock-tool-grid' + (cat.key === this.activeCategoryKey ? '' : ' hidden');
+      grid.dataset['category'] = cat.key;
 
       for (const t of cat.tools) {
-        const btn = document.createElement('button');
-        btn.className = 'tool-btn' + (t.key === this.activeToolKey ? ' active' : '');
-        btn.dataset['toolKey'] = t.key;
-        btn.setAttribute('aria-label', t.label);
-        btn.innerHTML = `<span class="tool-icon">${t.icon}</span><span class="tool-label">${t.label}</span>`;
-        btn.addEventListener('pointerdown', (e) => {
-          e.stopPropagation();
-          this.selectTool(t.key);
-        });
+        const btn = this.makeToolBtn(t.key, t.label, t.fallbackIcon, cat.key);
+        if (t.key === this.activeToolKey) btn.classList.add('active');
         grid.appendChild(btn);
       }
 
-      // "Mehr" category appends pause + speed controls inline in the grid
       if (cat.key === 'more') {
         grid.appendChild(this.buildControlsInGrid());
       }
@@ -217,17 +245,45 @@ export class UIScene extends Phaser.Scene {
     document.body.appendChild(this.dockEl);
   }
 
-  /** Builds pause + speed as pseudo-tool buttons for use inside the Mehr grid. */
+  /** Creates a single tool button with SVG icon (or emoji fallback). */
+  private makeToolBtn(
+    key: string,
+    label: string,
+    fallback: string,
+    catKey: CategoryKey,
+  ): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.className = 'tool-btn';
+    btn.dataset['toolKey'] = key;
+    btn.dataset['category'] = catKey;
+    btn.setAttribute('aria-label', label);
+    btn.style.setProperty('--cat-accent', CAT_ACCENT[catKey]);
+
+    const svgIcon = getToolIcon(key);
+    const iconHtml = svgIcon
+      ? `<span class="tool-icon tool-icon--svg">${svgIcon}</span>`
+      : `<span class="tool-icon">${fallback}</span>`;
+
+    btn.innerHTML = `${iconHtml}<span class="tool-label">${label}</span>`;
+    btn.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      this.selectTool(key);
+    });
+    return btn;
+  }
+
+  /** Builds pause + speed controls for the Mehr grid. */
   private buildControlsInGrid(): HTMLElement {
     const wrap = document.createElement('div');
     wrap.className = 'dock-controls-inline';
 
     // Pause button
     this.pauseBtn = document.createElement('button');
-    this.pauseBtn.className = 'tool-btn tool-btn--wide';
+    this.pauseBtn.className = 'tool-btn tool-btn--wide tool-btn--control';
     this.pauseBtn.id = 'btn-pause';
     this.pauseBtn.setAttribute('aria-label', 'Simulation pausieren');
-    this.pauseBtn.innerHTML = `<span class="tool-icon">⏸</span><span class="tool-label">Pause</span>`;
+    this.pauseBtn.style.setProperty('--cat-accent', CAT_ACCENT.more);
+    this.setPauseContent(false);
     this.pauseBtn.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       const gs = this.scene.get('GameScene') as GameScene | null;
@@ -269,21 +325,14 @@ export class UIScene extends Phaser.Scene {
   private switchCategory(key: CategoryKey): void {
     if (key === this.activeCategoryKey) return;
 
-    // Update tab highlight
     this.tabBtns.forEach((btn, k) => btn.classList.toggle('active', k === key));
-
-    // Swap visible grid
     this.toolGrids.forEach((grid, k) => grid.classList.toggle('hidden', k !== key));
-
     this.activeCategoryKey = key;
 
-    // Select first tool in the new category (unless it's "more")
     const cat = CATEGORIES.find(c => c.key === key);
     if (cat && cat.tools.length > 0 && key !== 'more') {
       this.selectTool(cat.tools[0].key);
     }
-
-    // Show hint toast
     if (cat) this.showCategoryHint(cat.hint);
   }
 
@@ -296,18 +345,24 @@ export class UIScene extends Phaser.Scene {
     el.classList.add('visible');
     this.hintTimeout = setTimeout(() => {
       el.classList.remove('visible');
-      // Wait for fade-out transition before hiding
       setTimeout(() => el.classList.add('hidden'), 350);
       this.hintTimeout = null;
     }, 2500);
   }
 
-  // ─── Sync-Hilfsmethoden ──────────────────────────────────────────────────
+  // ─── Sync helpers ─────────────────────────────────────────────────────────
+
+  private setPauseContent(paused: boolean): void {
+    const svgIcon = getToolIcon(paused ? 'speed' : 'pause');
+    const label   = paused ? 'Weiter' : 'Pause';
+    const iconHtml = svgIcon
+      ? `<span class="tool-icon tool-icon--svg">${svgIcon}</span>`
+      : `<span class="tool-icon">${paused ? '▶' : '⏸'}</span>`;
+    this.pauseBtn.innerHTML = `${iconHtml}<span class="tool-label">${label}</span>`;
+  }
 
   private syncPauseBtn(paused: boolean): void {
-    this.pauseBtn.innerHTML = paused
-      ? `<span class="tool-icon">▶</span><span class="tool-label">Weiter</span>`
-      : `<span class="tool-icon">⏸</span><span class="tool-label">Pause</span>`;
+    this.setPauseContent(paused);
     this.pauseBtn.classList.toggle('paused', paused);
     this.pauseBtn.setAttribute('aria-pressed', String(paused));
   }
@@ -364,9 +419,9 @@ export class UIScene extends Phaser.Scene {
     el.textContent = status;
     const colorMap: Record<string, string> = {
       FRIEDEN:          'var(--accent)',
-      ANSPANNUNG:       '#ffca45',
-      KRIEG:            '#ff4b4b',
-      WAFFENSTILLSTAND: '#aaffaa',
+      ANSPANNUNG:       'var(--accent-gold)',
+      KRIEG:            'var(--danger)',
+      WAFFENSTILLSTAND: 'var(--heal)',
     };
     el.style.color = colorMap[status] ?? 'var(--accent)';
   }
