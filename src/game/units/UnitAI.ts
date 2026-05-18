@@ -1,8 +1,14 @@
 /**
- * UnitAI — Phase 7
+ * UnitAI — Phase 7 / Contact-Fix
  *
  * Vollständige Rollen-KI für alle vier Rollen: gatherer, builder, guard, raider.
  * Portiert und überarbeitet aus dem Referenz-Prototyp.
+ *
+ * Neu (Contact-Fix):
+ * - Raider wandern im Frieden 13 Kacheln, bei Anspannung 20 Kacheln (war: 5).
+ * - Sichtkontakt-Ereignisse: Einheiten erkennen Feinde in CONTACT_DETECTION_RANGE.
+ * - Grenzvorfall-Ereignisse: Einheiten < CONTACT_BORDER_RANGE lösen extra Druck aus.
+ * - onContactEvent-Callback für GameScene → EventFeed-Integration.
  *
  * Kein Phaser. Liest WorldGrid + VillageManager, mutiert nur Unit-State.
  */
@@ -14,7 +20,17 @@ import { WorldGrid }      from '@game/world/WorldGrid';
 import { TileType }       from '@game/world/TileTypes';
 import { FactionKey, FACTION_KEYS } from '@game/factions/Faction';
 import { FACTION_TRAITS } from '@game/factions/FactionTraits';
+import { BALANCE }        from '@game/data/balance';
 
+export type ContactEventKind = 'sighting' | 'border';
+
+export interface ContactEvent {
+  kind:    ContactEventKind;
+  /** Fraktion, die den Feind gesichtet hat. */
+  spotter: FactionKey;
+  /** Gesichtete Fraktion. */
+  spotted: FactionKey;
+}
 
 function randi(min: number, max: number): number {
   return Math.floor(min + Math.random() * (max - min + 1));
@@ -32,6 +48,24 @@ export class UnitAI {
   /** Wird von GameScene nach jedem Diplomatie-Tick gesetzt. */
   isWar: boolean = false;
 
+  /**
+   * Diplomatischer Zustand — wird von UnitManager nach Diplomatie-Tick gesetzt.
+   * Steuert den Raider-Wanderradius.
+   */
+  isTension: boolean = false;
+
+  /**
+   * Callback für Kontakt-/Sichtungsereignisse.
+   * Wird von GameScene an EventFeed + DiplomacySystem weitergeleitet.
+   */
+  onContactEvent: ((evt: ContactEvent) => void) | null = null;
+
+  /**
+   * Cooldown-Zähler pro Fraktionspaar für Sichtungs-Events.
+   * Key: `${spotterKey}:${spottedKey}` — Ticks bis nächstes Event erlaubt.
+   */
+  private readonly contactCooldowns = new Map<string, number>();
+
   constructor(grid: WorldGrid, villages: VillageManager) {
     this.grid     = grid;
     this.villages = villages;
@@ -45,6 +79,11 @@ export class UnitAI {
 
     // Cooldown-Schritt
     if (u.cd > 0) u.cd--;
+
+    // Contact-Cooldowns herunterzählen
+    for (const [key, val] of this.contactCooldowns) {
+      if (val > 0) this.contactCooldowns.set(key, val - 1);
+    }
 
     // Beim Fliehen: immer nach Hause bewegen
     if (u.state === 'flee') {
@@ -60,11 +99,49 @@ export class UnitAI {
       return;
     }
 
+    // Sichtkontakt-Prüfung: nur für Raider und Guards (Kosten-Nutzen)
+    if (u.role === 'raider' || u.role === 'guard') {
+      this.checkContactSighting(u, allUnits);
+    }
+
     switch (u.role) {
       case 'gatherer': this.gathererAI(u, allUnits); break;
       case 'builder':  this.builderAI(u, allUnits);  break;
       case 'guard':    this.guardAI(u, allUnits);    break;
       case 'raider':   this.raiderAI(u, allUnits);   break;
+    }
+  }
+
+  // ─── Sichtkontakt-Erkennung ──────────────────────────────────────────────
+
+  /**
+   * Prüft ob eine Einheit Feinde in Sichtweite hat und feuert Contact-Events.
+   * Nur außerhalb des Kriegszustands aktiv — im Krieg ist Kontakt normal.
+   */
+  private checkContactSighting(u: Unit, allUnits: Unit[]): void {
+    if (this.isWar) return;
+    if (!this.onContactEvent) return;
+
+    for (const other of allUnits) {
+      if (other.dead || other.faction === u.faction) continue;
+
+      const d = dist(u.x, u.y, other.x, other.y);
+      if (d > BALANCE.CONTACT_DETECTION_RANGE) continue;
+
+      // Cooldown-Key: Spotter-Fraktion → Spotted-Fraktion
+      const cdKey = `${u.faction}:${other.faction}`;
+      const cooldown = this.contactCooldowns.get(cdKey) ?? 0;
+      if (cooldown > 0) continue;
+
+      // Art des Ereignisses bestimmen
+      const kind: ContactEventKind = d <= BALANCE.CONTACT_BORDER_RANGE
+        ? 'border'
+        : 'sighting';
+
+      this.contactCooldowns.set(cdKey, BALANCE.CONTACT_SIGHTING_COOLDOWN);
+      this.onContactEvent({ kind, spotter: u.faction, spotted: other.faction });
+      // Nur ein Event pro Tick pro Einheit
+      return;
     }
   }
 
@@ -169,15 +246,20 @@ export class UnitAI {
     const v = this.villages.villages[u.faction];
     if (!v) return;
 
-    // Im Frieden: Raider wandern nur in Heimatnähe, greifen aber trotzdem an wenn nötig
+    // Im Frieden / bei Anspannung: Raider erkunden in größerem Radius
+    // Peace:   13 Kacheln (war: 5) — macht Raider sichtbar aktiv
+    // Tension: 20 Kacheln — nähert sich feindlichem Gebiet
     if (!this.isWar) {
       const threat = this.combat.nearestEnemy(u, allUnits, 3);
       if (threat && dist(u.x, u.y, threat.x, threat.y) <= 1.5) {
         this.combat.fight(u, threat);
         return;
       }
-      u.state = 'patrol';
-      this.wanderNearHome(u, 5);
+      const wanderRadius = this.isTension
+        ? BALANCE.RAIDER_WANDER_TENSION   // 20 Kacheln bei Anspannung
+        : BALANCE.RAIDER_WANDER_PEACE;    // 13 Kacheln im Frieden
+      u.state = 'scout';
+      this.wanderNearHome(u, wanderRadius);
       return;
     }
 

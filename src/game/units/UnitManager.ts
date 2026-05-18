@@ -132,9 +132,10 @@ export class UnitManager {
     }
   }
 
-  /** Setzt den Kriegszustand für die KI (von GameScene nach Diplomatie-Tick). */
-  setWarState(isWar: boolean): void {
-    this.ai.isWar = isWar;
+  /** Setzt den Kriegs- und Spannungszustand für die KI (von GameScene nach Diplomatie-Tick). */
+  setWarState(isWar: boolean, isTension?: boolean): void {
+    this.ai.isWar     = isWar;
+    this.ai.isTension = isTension ?? isWar;
   }
 
   getAI(): UnitAI { return this.ai; }

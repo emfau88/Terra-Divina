@@ -47,6 +47,27 @@ export const BALANCE = {
   STARTING_FOOD_DEFAULT: 24,
   STARTING_FOOD_ORC:     34,   // +42% — Orks wachsen schnell, brauchen mehr Startvorrat
 
+  // ─── Szenario-Kontakt-Fix ──────────────────────────────────────────────
+  // Spawn-Distanz für Zwei-Fraktions-Szenarien (survive30, orcRaid, humanLastStand)
+  // Ziel: 20–34 Kacheln Abstand statt ~40 Kacheln.
+  SCENARIO_SPAWN_NEAR_DISTANCE: 26,   // Abstand in Kacheln für Human↔Orc im Szenario
+
+  // Raider-Wanderradius je nach diplomatischem Zustand
+  RAIDER_WANDER_PEACE:    13,   // war: 5 → fix: 13 (Erkundung)
+  RAIDER_WANDER_TENSION:  20,   // Anspannung: weiter, nähert sich feindlichem Gebiet
+  // Krieg: bestehende Aggression beibehalten (kein eigener Wert nötig)
+
+  // Sichtkontakt-Ereignisse (Contact/Sighting)
+  CONTACT_DETECTION_RANGE:     7,    // Kacheln — Einheit sieht Feind in dieser Reichweite
+  CONTACT_BORDER_RANGE:        4,    // Kacheln — "Grenzvorfall" (näher als detection)
+  CONTACT_SIGHTING_COOLDOWN:   30,   // Ticks pro Fraktionspaar — Mindestabstand zwischen Events
+  CONTACT_TENSION_SIGHTING:    4,    // Spannungsanstieg bei erstmaligem Sichtkontakt
+  CONTACT_TENSION_BORDER:      3,    // Spannungsanstieg bei Grenzvorfall (< 4 Kacheln)
+
+  // Szenario-spezifischer Spannungsmultiplikator
+  SCENARIO_TENSION_MULT:       2.0,  // Nur in gameMode === 'scenario' aktiv
+  SCENARIO_WAR_THRESHOLD:      55,   // Niedrigere Kriegsschwelle im Szenario (statt 80)
+
   // Phase VFX — FireSystem
   FIRE_SPREAD_INTERVAL_MS: 700,    // ms zwischen Spread-Ticks
   FIRE_BURN_MIN:            7,     // min Burn-Ticks bevor → Asche

@@ -20,6 +20,7 @@ import { TileType }          from '@game/world/TileTypes';
 import { COLS, ROWS }        from '@game/config';
 import { BuildingType }      from '@game/data/buildingDefs';
 import { BALANCE }           from '@game/data/balance';
+import { GameMode }          from '@game/world/WorldSetupConfig';
 
 export class VillageManager {
   readonly villages: Partial<Record<FactionKey, Village>> = {};
@@ -41,14 +42,25 @@ export class VillageManager {
    * Ohne factions-Liste: alle vier Fraktionen (human, orc, elf, dwarf).
    * Mit Liste: nur die genannten Fraktionen.
    *
-   * Verteilung:
+   * Verteilung (Standard/Sandbox):
    * - human: oben-mitte
    * - orc:   unten-mitte
    * - elf:   oben-links (Wald-Bereich)
    * - dwarf: unten-rechts (Berg-Bereich)
+   *
+   * Szenario-Modus (gameMode === 'scenario') mit genau 2 Fraktionen:
+   * Spawnt beide Fraktionen ~SCENARIO_SPAWN_NEAR_DISTANCE Kacheln voneinander
+   * entfernt auf der Landmasse, um sicherzustellen dass Kontakt innerhalb des
+   * Szenario-Zeitrahmens möglich ist.
    */
-  placeStartVillages(factions?: FactionKey[]): void {
+  placeStartVillages(factions?: FactionKey[], gameMode?: GameMode): void {
     const active = factions ?? (['human', 'orc', 'elf', 'dwarf'] as FactionKey[]);
+
+    // Szenario-Modus mit genau 2 Fraktionen: kontaktoptimierte Spawn-Platzierung
+    if (gameMode === 'scenario' && active.length === 2) {
+      this.placeScenarioVillages(active[0], active[1]);
+      return;
+    }
 
     const positions: Record<FactionKey, { x: number; y: number }> = {
       human: { x: COLS * 0.5,  y: ROWS * 0.25 },
@@ -61,6 +73,47 @@ export class VillageManager {
       const pos = positions[faction];
       const land = WorldGenerator.findLandNear(this.grid, pos.x, pos.y, 20);
       this.createVillage(faction, land.x, land.y);
+    }
+  }
+
+  /**
+   * Platziert zwei Fraktionen mit einem Abstand von SCENARIO_SPAWN_NEAR_DISTANCE
+   * Kacheln voneinander — sichert Kontakt im Szenario-Zeitrahmen.
+   *
+   * Algorithmus:
+   * 1. Faction A in der oberen Hälfte der Karte platzieren (nächstes Land bei 50% X, 30% Y).
+   * 2. Faction B so platzieren, dass Abstand 20–34 Kacheln in Richtung untere Hälfte.
+   * 3. Suchradius 22 Kacheln für findLandNear — größer als Standard (20) damit
+   *    auch Randkarten einen gültigen Landpunkt finden.
+   */
+  private placeScenarioVillages(factionA: FactionKey, factionB: FactionKey): void {
+    const target = BALANCE.SCENARIO_SPAWN_NEAR_DISTANCE;
+
+    // Fraktion A: obere Mitte der Karte
+    const posA = WorldGenerator.findLandNear(
+      this.grid,
+      COLS * 0.5,
+      ROWS * 0.28,
+      22,
+    );
+    this.createVillage(factionA, posA.x, posA.y);
+
+    // Fraktion B: target Kacheln in Richtung untere Hälfte von A entfernt
+    // Zielrichtung: leicht nach unten-rechts damit sie nicht exakt übereinander liegen
+    const bx = posA.x + target * 0.25;
+    const by = posA.y + target * 0.96;
+
+    const posB = WorldGenerator.findLandNear(this.grid, bx, by, 22);
+
+    // Sicherheitsprüfung: Abstand muss > 15 und < 40 Kacheln sein
+    const actualDist = Math.hypot(posB.x - posA.x, posB.y - posA.y);
+    if (actualDist < 15 || actualDist > 42) {
+      // Fallback: Direkt auf target-Kacheln-Abstand entlang der Y-Achse
+      const fallbackY = Math.min(this.grid.rows - 5, posA.y + target);
+      const fallback = WorldGenerator.findLandNear(this.grid, posA.x, fallbackY, 22);
+      this.createVillage(factionB, fallback.x, fallback.y);
+    } else {
+      this.createVillage(factionB, posB.x, posB.y);
     }
   }
 

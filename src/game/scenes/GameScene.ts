@@ -32,6 +32,8 @@ import { SaveSystem, SAVE_VERSION } from '@game/simulation/SaveSystem';
 import { BuildingType }       from '@game/data/buildingDefs';
 import { UnitRole }           from '@game/units/UnitRoles';
 import { UnitState }          from '@game/units/Unit';
+import { ContactEvent }       from '@game/units/UnitAI';
+import { BALANCE }            from '@game/data/balance';
 import { TileType }           from '@game/world/TileTypes';
 import { CreatureManager }    from '@game/creatures/CreatureManager';
 import { CreatureRenderer }   from '@game/rendering/CreatureRenderer';
@@ -106,7 +108,7 @@ export class GameScene extends Phaser.Scene {
 
     // 2. Dörfer + Gebäude
     this.villageManager = new VillageManager(this.grid);
-    this.villageManager.placeStartVillages(cfg.factions);
+    this.villageManager.placeStartVillages(cfg.factions, cfg.gameMode);
 
     // 3. Einheiten
     this.unitManager = new UnitManager(this.grid, this.villageManager);
@@ -126,6 +128,11 @@ export class GameScene extends Phaser.Scene {
       case 'balanced': this.diplomacy.tension = 10;  break;
       case 'warTorn':  this.diplomacy.tension = 50;  break;
       case 'chaos':    this.diplomacy.tension = 75;  break;
+    }
+
+    // Szenario-Modus: beschleunigte Spannungsdynamik aktivieren
+    if (cfg.gameMode === 'scenario') {
+      this.diplomacy.scenarioMode = true;
     }
 
     // 5. UI-Systeme
@@ -232,6 +239,27 @@ export class GameScene extends Phaser.Scene {
     // Treffer-Funken: CombatSystem → EffectSystem verdrahten (Phase 13E)
     this.unitManager.getAI().combat.onHit = (px: number, py: number) => {
       this.effectSystem.spawnHitSpark(px, py);
+    };
+
+    // Sichtkontakt-Events: UnitAI → EventFeed + DiplomacySystem (Contact-Fix)
+    this.unitManager.getAI().onContactEvent = (evt: ContactEvent) => {
+      const spotter = FACTIONS[evt.spotter];
+      const spotted = FACTIONS[evt.spotted];
+      if (evt.kind === 'border') {
+        // Grenzvorfall — Einheiten sehr nah
+        this.eventFeed.push(
+          `⚠ ${spotter.short}-Einheit an ${spotted.short}-Grenze`,
+          '#ffca45',
+        );
+        this.diplomacy.addTension(BALANCE.CONTACT_TENSION_BORDER);
+      } else {
+        // Erstsichtung / Annäherung
+        this.eventFeed.push(
+          `👁 ${spotter.name} entdeckt ${spotted.name}`,
+          '#ffaa22',
+        );
+        this.diplomacy.addTension(BALANCE.CONTACT_TENSION_SIGHTING);
+      }
     };
 
     // Kreatur-Callbacks: Treffer-Funken + EventFeed bei Tod
@@ -511,7 +539,7 @@ export class GameScene extends Phaser.Scene {
       this.villageAccum = 0;
       this.resourceSystem.tick(1);
       this.diplomacy.tick();
-      this.unitManager.setWarState(this.diplomacy.isWar);
+      this.unitManager.setWarState(this.diplomacy.isWar, this.diplomacy.isTension);
       this.pushHudUpdate();
       // Autosave bei jedem Dorf-Tick (~650 ms Spielzeit)
       this.saveGame();

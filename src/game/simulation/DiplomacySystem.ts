@@ -30,6 +30,14 @@ export class DiplomacySystem {
   tension: number = 0;          // 0–100
   truceTicks: number = 0;       // Verbleibende Waffenstillstand-Ticks
 
+  /**
+   * Aktiviert Szenario-Spannungsmodus:
+   * - Effektiver Kriegsschwellwert gesenkt auf SCENARIO_WAR_THRESHOLD
+   * - Basisanstieg mit SCENARIO_TENSION_MULT multipliziert
+   * Wird von GameScene gesetzt wenn gameMode === 'scenario'.
+   */
+  scenarioMode: boolean = false;
+
   /** Callback wenn sich der Zustand ändert — GameScene nutzt ihn fürs HUD. */
   onStateChange: ((state: DiplomaticState) => void) | null = null;
 
@@ -85,11 +93,13 @@ export class DiplomacySystem {
     const imbalancePressure = imbalance > 0.3 ? BALANCE.TENSION_IMBALANCE_RATE * imbalance : 0;
 
     // Im Frieden / Anspannung: natürlicher Anstieg
-    const baseDrift = this.state === 'peace'
+    // Im Szenario-Modus wird der Basisanstieg mit SCENARIO_TENSION_MULT skaliert
+    const mult = this.scenarioMode ? BALANCE.SCENARIO_TENSION_MULT : 1.0;
+    const baseDrift = (this.state === 'peace'
       ? BALANCE.TENSION_PEACE_DRIFT
       : this.state === 'tension'
         ? BALANCE.TENSION_TENSION_DRIFT
-        : 0;
+        : 0) * mult;
 
     // Im Krieg: Spannung sinkt nicht weiter durch Drift
     if (this.state === 'war') {
@@ -114,6 +124,11 @@ export class DiplomacySystem {
   private transition(): void {
     const prev = this.state;
 
+    // Im Szenario-Modus gelten niedrigere Kriegsschwellen
+    const warThreshold = this.scenarioMode
+      ? BALANCE.SCENARIO_WAR_THRESHOLD
+      : BALANCE.TENSION_THRESHOLD_WAR;
+
     switch (this.state) {
       case 'peace':
         if (this.tension >= BALANCE.TENSION_THRESHOLD_TENSION) {
@@ -122,7 +137,7 @@ export class DiplomacySystem {
         break;
 
       case 'tension':
-        if (this.tension >= BALANCE.TENSION_THRESHOLD_WAR) {
+        if (this.tension >= warThreshold) {
           this.state = 'war';
         } else if (this.tension < BALANCE.TENSION_THRESHOLD_TENSION * 0.6) {
           this.state = 'peace';
