@@ -98,10 +98,18 @@ export class UnitRenderer {
       g.fillRect(px - 7, py - 11, 14 * ratio, 2);
     }
 
-    // Ressourcen-Indikator (trägt etwas)
-    if (u.carryFood + u.carryWood > 0) {
-      g.fillStyle(0xffe28a, 0.9);
-      g.fillCircle(px + 6, py - 6, 2.5);
+    // Gatherer carry visual — distinct dots above unit at py-16.
+    // Yellow-green dot = carrying food; brown dot = carrying wood.
+    // Disappears automatically when carryFood/carryWood return to 0 after delivery.
+    if (u.carryFood > 0) {
+      // Yellow-green: food/crop colour
+      g.fillStyle(0x99e040, 1.0);
+      g.fillCircle(px, py - 16, 3);
+    }
+    if (u.carryWood > 0) {
+      // Warm brown: wood colour
+      g.fillStyle(0x8b5a2b, 1.0);
+      g.fillCircle(px + (u.carryFood > 0 ? 7 : 0), py - 16, 3);
     }
 
     // Hunger-Indikator: oranges Ausrufezeichen-Punkt über der Einheit

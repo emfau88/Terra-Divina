@@ -14,7 +14,7 @@ import { Building }  from '@game/factions/Building';
 import { Village }   from '@game/factions/Village';
 import { BuildSite } from '@game/factions/Village';
 import { FACTIONS, FactionKey, FACTION_KEYS } from '@game/factions/Faction';
-import { TILE } from '@game/config';
+import { TILE, COLS, ROWS } from '@game/config';
 
 export class BuildingRenderer {
   private readonly buildG:  Phaser.GameObjects.Graphics;
@@ -77,25 +77,34 @@ export class BuildingRenderer {
     for (const key of FACTION_KEYS) {
       const v = this.villages[key];
       if (!v) continue;
-      const f  = FACTIONS[key];
-      const cx = v.x * TILE + TILE / 2;
-      const cy = v.y * TILE + TILE / 2;
-      const r  = v.territory * TILE;
+      const f = FACTIONS[key];
+      const t = v.territory;
 
-      // Fix 4 — War territory pulse: brighter fill + orange-red tint when at war.
-      // Normal: fill 0.055 alpha, faction color.
-      // At war:  fill 0.22 alpha, blended toward red/orange (0xff4422).
-      const fillColor  = this.isAtWar ? 0xff4422 : f.color;
-      const fillAlpha  = this.isAtWar ? 0.22     : 0.055;
-      const lineAlpha  = this.isAtWar ? 0.38     : 0.14;
+      // Square tile-aligned territory border (WorldBox-style).
+      // The rectangle covers all tiles within `territory` tiles of the village center,
+      // clamped to the world grid bounds.
+      const left   = Math.max(0,    v.x - t)     * TILE;
+      const top    = Math.max(0,    v.y - t)     * TILE;
+      const right  = Math.min(COLS, v.x + t + 1) * TILE;
+      const bottom = Math.min(ROWS, v.y + t + 1) * TILE;
+      const w = right  - left;
+      const h = bottom - top;
 
-      // Weicher Füll-Kreis
-      this.shadowG.fillStyle(fillColor, fillAlpha);
-      this.shadowG.fillCircle(cx, cy, r);
+      // Fix 4 — War territory pulse: stronger alpha + orange-red tint at war.
+      // Normal: fill 0.06 alpha, faction color, thin 1.5px border at 0.4 alpha.
+      // At war:  fill 0.18 alpha, orange-red (0xff4422), border at 0.7 alpha.
+      const rectColor = this.isAtWar ? 0xff4422 : f.color;
+      const fillAlpha = this.isAtWar ? 0.18     : 0.06;
+      const lineAlpha = this.isAtWar ? 0.70     : 0.42;
+      const lineWidth = this.isAtWar ? 2        : 1.5;
 
-      // Subtile Umriss-Linie
-      this.shadowG.lineStyle(2, fillColor, lineAlpha);
-      this.shadowG.strokeCircle(cx, cy, r);
+      // Subtle fill
+      this.shadowG.fillStyle(rectColor, fillAlpha);
+      this.shadowG.fillRect(left, top, w, h);
+
+      // Crisp rectangular border — square corners, tile-aligned
+      this.shadowG.lineStyle(lineWidth, rectColor, lineAlpha);
+      this.shadowG.strokeRect(left, top, w, h);
     }
   }
 

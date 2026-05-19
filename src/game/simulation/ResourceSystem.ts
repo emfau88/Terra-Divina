@@ -310,7 +310,9 @@ export class ResourceSystem {
     if (v.wood < BALANCE.LEVEL_UP_WOOD_COST) return;
     v.wood -= BALANCE.LEVEL_UP_WOOD_COST;
     v.level++;
-    this.onBuild?.(faction); // Neuzeichnen
+    // Territory grows with level: level 1 → radius 7, level 2 → 8, …, level 8 → 14.
+    v.territory = 6 + v.level;
+    this.onBuild?.(faction); // Neuzeichnen — redraws the expanded territory rectangle
   }
 
   // ─── Hilfsmethoden ───────────────────────────────────────────────────────
