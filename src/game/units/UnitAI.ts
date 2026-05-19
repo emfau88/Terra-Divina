@@ -61,10 +61,25 @@ export class UnitAI {
   onContactEvent: ((evt: ContactEvent) => void) | null = null;
 
   /**
+   * Fix 3 — Callback für Raider-Gruppen-Marsch-Events.
+   * Wird ausgelöst wenn 2+ Raider einer Fraktion auf dasselbe Ziel marschieren.
+   * Parameter: angreifende Fraktion, Ziel-X, Ziel-Y der feindlichen Siedlung.
+   */
+  onRaidGroup: ((faction: FactionKey, targetX: number, targetY: number) => void) | null = null;
+
+  /**
    * Cooldown-Zähler pro Fraktionspaar für Sichtungs-Events.
    * Key: `${spotterKey}:${spottedKey}` — Ticks bis nächstes Event erlaubt.
    */
   private readonly contactCooldowns = new Map<string, number>();
+
+  /**
+   * Fix 3 — Cooldown-Zähler pro Fraktion für Raid-Gruppen-Events.
+   * Key: FactionKey — Ticks bis zum nächsten erlaubten Raid-Group-Event.
+   * ~20 Sekunden Cooldown bei 250 ms AI-Intervall = 80 Ticks.
+   */
+  private readonly raidGroupCooldowns = new Map<string, number>();
+  private static readonly RAID_GROUP_EVENT_COOLDOWN = 80;
 
   constructor(grid: WorldGrid, villages: VillageManager) {
     this.grid     = grid;
@@ -83,6 +98,10 @@ export class UnitAI {
     // Contact-Cooldowns herunterzählen
     for (const [key, val] of this.contactCooldowns) {
       if (val > 0) this.contactCooldowns.set(key, val - 1);
+    }
+    // Fix 3 — Raid-Group-Event-Cooldowns herunterzählen
+    for (const [key, val] of this.raidGroupCooldowns) {
+      if (val > 0) this.raidGroupCooldowns.set(key, val - 1);
     }
 
     // Beim Fliehen: immer nach Hause bewegen
@@ -370,6 +389,16 @@ export class UnitAI {
           ally.persistTicks = BALANCE.RAIDER_GROUP_PERSIST;
           ally.state        = 'march';
           groupCount++;
+        }
+      }
+
+      // Fix 3 — fire onRaidGroup when 2+ raiders converge on same target
+      if (groupCount >= 1 && this.onRaidGroup) {
+        const cdKey  = u.faction;
+        const onCd   = (this.raidGroupCooldowns.get(cdKey) ?? 0) > 0;
+        if (!onCd) {
+          this.raidGroupCooldowns.set(cdKey, UnitAI.RAID_GROUP_EVENT_COOLDOWN);
+          this.onRaidGroup(u.faction, u.targetX, u.targetY);
         }
       }
     }

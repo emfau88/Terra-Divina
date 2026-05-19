@@ -30,6 +30,13 @@ export class CombatSystem {
    */
   onKill: ((attacker: Unit, defender: Unit) => void) | null = null;
 
+  /**
+   * Fix 5 — Callback für Raider-Angriff auf Gebäude.
+   * Wird ausgelöst wenn eine Einheit ein feindliches Gebäude trifft (nicht bei Feuer/Meteor).
+   * Parameter: (attacker, building) — building noch nicht zerstört.
+   */
+  onBuildingHit: ((attacker: Unit, building: Building) => void) | null = null;
+
   constructor(villages: VillageManager) {
     this.villages = villages;
   }
@@ -67,6 +74,9 @@ export class CombatSystem {
     building.hp = Math.max(minHp, building.hp - dmg);
     // Gebäude-Flash auslösen damit der Renderer eine rote Überlagerung zeigt (Phase 13E)
     building.hitFlash = 400;
+
+    // Fix 5 — fire onBuildingHit for Village Under Attack EventFeed
+    this.onBuildingHit?.(attacker, building);
 
     if (building.hp <= 0) {
       this.villages.destroyBuilding(building);

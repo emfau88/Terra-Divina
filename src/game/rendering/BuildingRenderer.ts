@@ -23,6 +23,13 @@ export class BuildingRenderer {
   /** Alle bekannten Dörfer — werden für Territorium-Auren benötigt. */
   private villages: Partial<Record<FactionKey, Village>> = {};
 
+  /**
+   * Fix 4 — War territory pulse.
+   * When true, territory auras are drawn brighter with a red/orange tint.
+   * Set by GameScene each village-tick via setWarState().
+   */
+  isAtWar: boolean = false;
+
   constructor(
     buildGraphics:  Phaser.GameObjects.Graphics,
     shadowGraphics: Phaser.GameObjects.Graphics,
@@ -35,6 +42,11 @@ export class BuildingRenderer {
 
   setVillages(villages: Partial<Record<FactionKey, Village>>): void {
     this.villages = villages;
+  }
+
+  /** Fix 4 — called by GameScene each village-tick to sync war state. */
+  setWarState(atWar: boolean): void {
+    this.isAtWar = atWar;
   }
 
   /** Vollständiges Neuzeichnen aller Gebäude und Auren. */
@@ -70,12 +82,19 @@ export class BuildingRenderer {
       const cy = v.y * TILE + TILE / 2;
       const r  = v.territory * TILE;
 
+      // Fix 4 — War territory pulse: brighter fill + orange-red tint when at war.
+      // Normal: fill 0.055 alpha, faction color.
+      // At war:  fill 0.22 alpha, blended toward red/orange (0xff4422).
+      const fillColor  = this.isAtWar ? 0xff4422 : f.color;
+      const fillAlpha  = this.isAtWar ? 0.22     : 0.055;
+      const lineAlpha  = this.isAtWar ? 0.38     : 0.14;
+
       // Weicher Füll-Kreis
-      this.shadowG.fillStyle(f.color, 0.055);
+      this.shadowG.fillStyle(fillColor, fillAlpha);
       this.shadowG.fillCircle(cx, cy, r);
 
       // Subtile Umriss-Linie
-      this.shadowG.lineStyle(2, f.color, 0.14);
+      this.shadowG.lineStyle(2, fillColor, lineAlpha);
       this.shadowG.strokeCircle(cx, cy, r);
     }
   }

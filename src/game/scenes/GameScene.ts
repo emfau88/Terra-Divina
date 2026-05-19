@@ -192,20 +192,32 @@ export class GameScene extends Phaser.Scene {
     this.diplomacy.onStateChange = (state: DiplomaticState) => {
       const ui = this.scene.get('UIScene') as UIScene | null;
       ui?.setStatus(this.diplomacy.statusText);
-      // Zustandsspezifische Nachrichten für den EventFeed (Phase 13E)
+
+      // Fix 1 — Faction-named war/truce messages in EventFeed.
+      // Collect active faction names for the declaration line.
+      const activeFactions = FACTION_KEYS
+        .filter(k => this.villageManager.villages[k] !== undefined)
+        .map(k => FACTIONS[k].name);
+      const factionPair = activeFactions.join(' vs. ');
+      const factionAnd  = activeFactions.join(' & ');
+
       const msgMap: Record<DiplomaticState, string> = {
         tension: '⚔ Spannung steigt an der Grenze',
-        war:     '🔴 KRIEG — Feinde greifen an!',
-        truce:   '🤝 Waffenstillstand vereinbart',
+        war:     `⚔ KRIEG: ${factionPair}!`,
+        truce:   `🕊 Waffenstillstand: ${factionAnd}`,
         peace:   '☮ Frieden kehrt zurück',
       };
       const colorMap: Record<DiplomaticState, string> = {
         tension: '#ffca45',
-        war:     '#ff4b4b',
+        war:     '#ff4444',
         truce:   '#aaffaa',
         peace:   '#77d7ff',
       };
       this.eventFeed.push(msgMap[state], colorMap[state]);
+
+      // Fix 4 — sync war state to BuildingRenderer for territory pulse.
+      this.buildingRenderer.setWarState(this.diplomacy.isWar);
+      this.buildingRenderer.drawAll(this.villageManager.liveBuildings);
     };
 
     // 7. Kamera
@@ -241,6 +253,20 @@ export class GameScene extends Phaser.Scene {
       this.effectSystem.spawnHitSpark(px, py);
     };
 
+    // Fix 5 — Village Under Attack EventFeed: per-building cooldown (15 s = ~15000 ms wall time)
+    const buildingAttackTs = new Map<number, number>();
+    const BUILDING_ATTACK_COOLDOWN_MS = 15000;
+    this.unitManager.getAI().combat.onBuildingHit = (_attacker, building) => {
+      if (!this.diplomacy.isWar) return;
+      const now = performance.now();
+      const last = buildingAttackTs.get(building.id) ?? 0;
+      if (now - last < BUILDING_ATTACK_COOLDOWN_MS) return;
+      buildingAttackTs.set(building.id, now);
+      const defFac = FACTIONS[building.faction];
+      const css    = '#' + defFac.color.toString(16).padStart(6, '0');
+      this.eventFeed.push(`${defFac.name}-Gebäude wird angegriffen!`, css);
+    };
+
     // Kampftod-Meldungen: CombatSystem → EventFeed (AI-Fix)
     // Globaler Cooldown verhindert Spam in großen Schlachten.
     let lastDeathEventMs = 0;
@@ -264,6 +290,18 @@ export class GameScene extends Phaser.Scene {
       };
       const defRole = roleLabel[defender.role] ?? defender.role;
       this.eventFeed.push(`${aFac.short} tötet ${defRole}`, color);
+    };
+
+    // Fix 3 — Raid Group EventFeed: UnitAI → EventFeed when 2+ raiders march together
+    this.unitManager.getAI().onRaidGroup = (faction: FactionKey, _tx: number, _ty: number) => {
+      if (!this.diplomacy.isWar) return;
+      // Find the enemy village this raid group is marching toward — report by defender name
+      const attackerFac = FACTIONS[faction];
+      // Determine which enemy faction owns the territory nearest to target
+      const enemyKey = FACTION_KEYS.find(k => k !== faction && this.villageManager.villages[k] !== undefined);
+      const defenderName = enemyKey ? FACTIONS[enemyKey].name : 'feindliches Dorf';
+      const css = '#' + attackerFac.color.toString(16).padStart(6, '0');
+      this.eventFeed.push(`${attackerFac.name}-Kriegstrupp marschiert auf ${defenderName}`, css);
     };
 
     // Sichtkontakt-Events: UnitAI → EventFeed + DiplomacySystem (Contact-Fix)
@@ -565,6 +603,8 @@ export class GameScene extends Phaser.Scene {
       this.resourceSystem.tick(1);
       this.diplomacy.tick();
       this.unitManager.setWarState(this.diplomacy.isWar, this.diplomacy.isTension);
+      // Fix 4 — keep BuildingRenderer war state in sync every village tick
+      this.buildingRenderer.setWarState(this.diplomacy.isWar);
       this.pushHudUpdate();
       // Redraw buildings every village tick when build sites are active
       // (progress bar advances each tick — needs a redraw to show it)

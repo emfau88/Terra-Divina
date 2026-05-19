@@ -74,6 +74,21 @@ export class UnitRenderer {
       // gatherer: kein extra Indikator
     }
 
+    // Fix 2 — War banner: faction-colored flagpole + flag triangle above raider
+    // when in an active war-march state. Geometry only, no Text/Sprite.
+    // Drawn here (before HP bar) so the banner sits below the HP bar visually.
+    if (
+      u.role === 'raider' &&
+      (u.state === 'march' || u.state === 'raid' || u.state === 'siege')
+    ) {
+      // Flagpole: thin vertical line, 6px tall, starting just above the unit top
+      g.fillStyle(0x4a3010, 1.0);
+      g.fillRect(px - 0.5, py - 20, 1, 6);
+      // Flag: small filled triangle at the top of the pole, faction color
+      g.fillStyle(fc.color, 1.0);
+      g.fillTriangle(px, py - 20, px + 5, py - 18, px, py - 16);
+    }
+
     // HP-Balken (nur wenn beschädigt)
     if (u.hp < u.maxHp) {
       g.fillStyle(0x1b1111, 0.8);

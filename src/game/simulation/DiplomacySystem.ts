@@ -177,6 +177,17 @@ export class DiplomacySystem {
   get isWar():     boolean { return this.state === 'war'; }
   get isTension(): boolean { return this.state === 'tension' || this.state === 'war'; }
 
+  /**
+   * Fix 4 — per-faction war check for BuildingRenderer territory pulse.
+   * Currently war is global (no bilateral pair tracking), so any active war
+   * applies to all factions. The faction parameter is accepted for future
+   * bilateral extension but currently returns the global war flag.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  isAtWar(_faction: import('@game/factions/Faction').FactionKey): boolean {
+    return this.state === 'war';
+  }
+
   /** Gibt den lokalisierten Statustext für das HUD zurück. */
   get statusText(): string {
     switch (this.state) {
