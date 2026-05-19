@@ -51,6 +51,12 @@ export class HungerSystem {
   /** Zähler pro Fraktion für verzögerte Schadens-Ticks. */
   private readonly starveTick: Partial<Record<FactionKey, number>> = {};
 
+  /**
+   * Fix 3 — consecutive ticks where food was at 0 (for rationing logic).
+   * Reset when food > 0 again.
+   */
+  private readonly foodDebtTicks: Partial<Record<FactionKey, number>> = {};
+
   /** Zeitstempel (performance.now()) der letzten Feed-Meldung pro Fraktion. */
   private readonly lastFeedMs: Partial<Record<FactionKey, number>> = {};
 
@@ -76,12 +82,22 @@ export class HungerSystem {
     const pop = this.units.liveCount(faction);
     if (pop === 0) return;
 
-    const consumption = pop * BALANCE.FOOD_CONSUMPTION_PER_UNIT;
+    // Fix 3 — rationing: if food has been at 0 for 5+ consecutive ticks,
+    // apply a 25% consumption reduction to simulate emergency rationing.
+    const debtTicks = this.foodDebtTicks[faction] ?? 0;
+    const rationMult = debtTicks >= 5 ? 0.75 : 1.0;
+
+    const consumption = pop * BALANCE.FOOD_CONSUMPTION_PER_UNIT * rationMult;
     v.food -= consumption;
+
+    // Fix 3 — food floor: cap at -20 to prevent debt spirals in edge cases
+    // (e.g. if another system subtracts food directly).
+    v.food = Math.max(v.food, -20);
 
     if (v.food >= 0) {
       // Versorgt — Hunger abbauen, verletzte Einheiten heilen
       v.hunger = Math.max(0, v.hunger - 0.25);
+      this.foodDebtTicks[faction] = 0;  // Fix 3 — reset debt counter
 
       // isStarving zurücksetzen für alle Einheiten dieser Fraktion
       for (const u of this.units.units) {
@@ -109,6 +125,7 @@ export class HungerSystem {
     // Kein Essen
     v.food   = 0;
     v.hunger += 0.8;
+    this.foodDebtTicks[faction] = debtTicks + 1;  // Fix 3 — track consecutive debt ticks
 
     // "Kein Vorrat" melden (einmalig beim ersten Leer-Werden)
     if (!this.wasEmpty[faction]) {

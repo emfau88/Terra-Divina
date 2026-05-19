@@ -37,14 +37,41 @@ export class UnitRenderer {
     const px = u.visualX;
     const py = u.visualY;
 
-    // Boden-Schatten
+    // ─── Role-specific body parameters ──────────────────────────────────────
+    // Each role gets a distinct silhouette radius and color treatment.
+    let bodyRadius: number;
+    let rawColor: number;
+
+    switch (u.role) {
+      case 'gatherer':
+        // Slightly smaller — lighter/desaturated feel via alpha blend trick
+        bodyRadius = 4;
+        rawColor   = fc.color;
+        break;
+      case 'builder':
+        bodyRadius = 5;
+        rawColor   = fc.color;
+        break;
+      case 'guard':
+        // Larger body, darkened shade (multiply each channel by 0.75)
+        bodyRadius = 6;
+        rawColor   = UnitRenderer.darkenColor(fc.color, 0.75);
+        break;
+      case 'raider':
+      default:
+        bodyRadius = 6;
+        rawColor   = fc.color;
+        break;
+    }
+
+    // Boden-Schatten — scale ellipse width with body size
     g.fillStyle(0x000000, 0.25);
-    g.fillEllipse(px, py + 6, 13, 5);
+    g.fillEllipse(px, py + bodyRadius + 2, bodyRadius * 2 + 1, 5);
 
     // Körper — bei aktivem Treffer-Flash in hellem Weiß-Gelb zeichnen
-    const bodyColor = u.hitFlash > 0 ? 0xffffa0 : fc.color;
+    const bodyColor = u.hitFlash > 0 ? 0xffffa0 : rawColor;
     g.fillStyle(bodyColor, 1);
-    g.fillCircle(px, py, 6);
+    g.fillCircle(px, py, bodyRadius);
 
     // Glanzpunkt
     g.fillStyle(0xffffff, 0.85);
@@ -52,26 +79,34 @@ export class UnitRenderer {
 
     // Beine / Basis
     g.fillStyle(fc.dark, 0.95);
-    g.fillRect(px - 4, py + 4, 8, 4);
+    g.fillRect(px - 4, py + bodyRadius - 1, 8, 4);
 
-    // Rollenindikator
+    // ─── Role-specific shape indicators ──────────────────────────────────────
     switch (u.role) {
-      case 'guard':
-        // Weißer Ring
-        g.lineStyle(2, 0xffffff, 0.75);
-        g.strokeCircle(px, py, 7.2);
+      case 'gatherer':
+        // No extra indicator — carry dots already distinguish gatherers
         break;
+
+      case 'builder':
+        // Small square "tool" offset to the right
+        g.fillStyle(0xffd36c, 0.95);
+        g.fillRect(px + 5, py - 2, 3, 3);
+        break;
+
+      case 'guard':
+        // Small vertical bar above = spear silhouette
+        g.fillStyle(fc.dark, 1.0);
+        g.fillRect(px - 1, py - 9, 2, 5);
+        break;
+
       case 'raider':
-        // Rot-oranges Dreieck oben = gut sichtbare Angriffsspitze (Phase 13E)
+        // Horizontal bar through center = sword belt silhouette
+        g.fillStyle(0xff6633, 1.0);
+        g.fillRect(px - 3, py - 1, 6, 2);
+        // Keep original attack-triangle indicator
         g.fillStyle(0xff6633, 1.0);
         g.fillTriangle(px - 4, py - 8, px + 4, py - 8, px, py - 14);
         break;
-      case 'builder':
-        // Kleines gelbes Quadrat = Werkzeug
-        g.fillStyle(0xffd36c, 0.95);
-        g.fillRect(px + 4, py - 8, 5, 5);
-        break;
-      // gatherer: kein extra Indikator
     }
 
     // Fix 2 — War banner: faction-colored flagpole + flag triangle above raider
@@ -122,6 +157,19 @@ export class UnitRenderer {
     // Kleines geometrisches Symbol über der Einheit — zeigt lesbar was sie tut.
     // Kein per-Unit Text-Objekt (zu teuer bei 50+ Einheiten) — reine Graphics-Shapes.
     this.drawStateIcon(u, px, py);
+  }
+
+  // ─── Color helpers ───────────────────────────────────────────────────────
+
+  /**
+   * Multiplies each RGB channel of a packed hex color by `factor` (0–1).
+   * Used to produce role-specific shading without requiring extra assets.
+   */
+  private static darkenColor(color: number, factor: number): number {
+    const r = Math.round(((color >> 16) & 0xff) * factor);
+    const g = Math.round(((color >>  8) & 0xff) * factor);
+    const b = Math.round(( color        & 0xff) * factor);
+    return (r << 16) | (g << 8) | b;
   }
 
   /**

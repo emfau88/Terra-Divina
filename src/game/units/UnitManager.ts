@@ -72,6 +72,8 @@ export class UnitManager {
       }
       this.removeDeadUnits();
       this.rebalanceRoles();
+      // Fix 4 — last-survivor rescue: prevent silent faction death
+      this.rescueSingleSurvivor();
     }
   }
 
@@ -108,6 +110,19 @@ export class UnitManager {
         const g = alive.find(u => u.role === 'gatherer');
         if (g) { g.role = 'builder'; continue; }
       }
+
+      // Fix 5 — Builder surplus: if there are no active buildSites AND more builders
+      // than the minimum ratio requires, demote one idle builder to gatherer so
+      // food production doesn't stall while the village has nothing to build.
+      const v = this.villages.villages[faction];
+      const noBuildWork = !v || v.buildSites.length === 0;
+      const builderMin  = Math.ceil(n * BALANCE.ROLE_BUILDER_MIN);
+      if (noBuildWork && builders > builderMin + 1) {
+        const idleBuilder = alive.find(
+          u => u.role === 'builder' && u.state === 'wander',
+        );
+        if (idleBuilder) { idleBuilder.role = 'gatherer'; continue; }
+      }
     }
   }
 
@@ -129,6 +144,29 @@ export class UnitManager {
   private removeDeadUnits(): void {
     for (let i = this.units.length - 1; i >= 0; i--) {
       if (this.units[i].dead) this.units.splice(i, 1);
+    }
+  }
+
+  /**
+   * Fix 4 — Last-Survivor Rescue.
+   *
+   * If a faction has fewer than 3 live units AND the village has enough food,
+   * force-spawn a gatherer to prevent the faction from collapsing silently.
+   * This bypasses normal role-ratio logic — it's purely a recovery mechanism.
+   * Only triggers once per tick check (not repeatedly in a loop) to avoid
+   * overpowering the food economy on first startup.
+   */
+  private rescueSingleSurvivor(): void {
+    for (const faction of FACTION_KEYS) {
+      const v = this.villages.villages[faction];
+      if (!v) continue;
+      const alive = this.units.filter(u => u.faction === faction && !u.dead);
+      if (alive.length >= 3) continue;
+      if (alive.length === 0) continue;  // Village already destroyed — don't spawn
+      if (v.food < BALANCE.SPAWN_FOOD_COST) continue;
+
+      v.food -= BALANCE.SPAWN_FOOD_COST;
+      this.spawnUnit(faction, 'gatherer');
     }
   }
 

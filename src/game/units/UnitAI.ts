@@ -216,8 +216,20 @@ export class UnitAI {
       return;
     }
 
-    // ── Priority 1: Walk to assigned or nearest unassigned BuildSite ─────────
+    // ── Fix 2: Clear stale BuildSite assignments (dead units holding slots) ──
     const v = this.villages.villages[u.faction];
+    if (v) {
+      for (const site of v.buildSites) {
+        if (site.assignedUnitId !== null) {
+          const assignedUnit = allUnits.find(au => au.id === site.assignedUnitId);
+          if (!assignedUnit || assignedUnit.dead) {
+            site.assignedUnitId = null;
+          }
+        }
+      }
+    }
+
+    // ── Priority 1: Walk to assigned or nearest unassigned BuildSite ─────────
     if (v && v.buildSites.length > 0) {
       const site =
         v.buildSites.find(s => s.assignedUnitId === u.id) ??
