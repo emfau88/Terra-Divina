@@ -86,7 +86,11 @@ export class MainMenuScene extends Phaser.Scene {
     if (!factionRow) return;
     factionRow.querySelectorAll<HTMLButtonElement>('.setup-btn--faction').forEach((btn) => {
       const faction = btn.dataset['faction'] as FactionKey | undefined;
-      if (faction) btn.classList.toggle('active', this.cfg.factions.includes(faction));
+      if (!faction) return;
+      const isActive = this.cfg.factions.includes(faction);
+      btn.classList.toggle('active', isActive);
+      const fc = btn.dataset['fc'];
+      if (fc) btn.style.setProperty('--faction-color', fc);
     });
   }
 
@@ -102,6 +106,8 @@ export class MainMenuScene extends Phaser.Scene {
     const factionRow = document.getElementById('setup-factions');
     if (factionRow) {
       factionRow.querySelectorAll<HTMLButtonElement>('.setup-btn--faction').forEach((btn) => {
+        const fc = btn.dataset['fc'];
+        if (fc) btn.style.setProperty('--faction-color', fc);
         btn.addEventListener('click', () => {
           const faction = btn.dataset['faction'] as FactionKey | undefined;
           if (!faction) return;

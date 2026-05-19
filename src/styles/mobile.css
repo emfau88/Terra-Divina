@@ -804,12 +804,56 @@ body.inspect-open #event-feed,
 }
 .setup-btn:active { opacity: 0.8; }
 
-.setup-btn--faction { flex: 1; min-width: 70px; font-weight: 700; }
+.setup-faction-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 8px;
+}
+
+.setup-row--factions { gap: 10px; }
+
+.setup-btn--faction {
+  flex: 1;
+  min-width: 70px;
+  height: 80px;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 4px;
+  background: rgba(255,255,255,0.03);
+  border: 2px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  opacity: 0.45;
+  position: relative;
+}
+
+.setup-btn--faction .faction-emoji {
+  font-size: 22px;
+  line-height: 1;
+}
+.setup-btn--faction .faction-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+}
+.setup-btn--faction .faction-check {
+  position: absolute;
+  top: 5px; right: 7px;
+  font-size: 13px;
+  font-weight: 900;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
 .setup-btn--faction.active {
-  /* override accent with faction colour from inline style */
-  border-color: currentColor;
-  background: rgba(255,255,255,0.06);
-  box-shadow: 0 0 0 1px currentColor;
+  opacity: 1;
+  border-color: var(--faction-color, var(--ui-border-hi));
+  background: rgba(255,255,255,0.10);
+  box-shadow: 0 0 0 1px var(--faction-color, var(--ui-border-hi)), inset 0 0 20px rgba(255,255,255,0.04);
+}
+.setup-btn--faction.active .faction-check {
+  opacity: 1;
+  color: var(--faction-color, var(--ui-border-hi));
 }
 
 .setup-seed-row {

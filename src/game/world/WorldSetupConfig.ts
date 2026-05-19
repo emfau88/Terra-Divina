@@ -41,6 +41,6 @@ export function defaultConfig(): WorldSetupConfig {
     worldType: 'island',
     startMode: 'balanced',
     gameMode:  'sandbox',
-    factions:  ['human', 'orc', 'elf', 'dwarf'],
+    factions:  ['human', 'orc'],
   };
 }

@@ -128,12 +128,28 @@
         </div>
 
         <div class="setup-section">
-          <div class="setup-label">Völker</div>
+          <div class="setup-label">Völker <span class="setup-faction-hint">mind. 2 wählen</span></div>
           <div class="setup-row setup-row--factions" id="setup-factions">
-            <button class="setup-btn setup-btn--faction active" data-faction="human"  style="color:#5ec8ff">Menschen</button>
-            <button class="setup-btn setup-btn--faction active" data-faction="orc"    style="color:#ff5d63">Orks</button>
-            <button class="setup-btn setup-btn--faction active" data-faction="elf"    style="color:#6dff8a">Elfen</button>
-            <button class="setup-btn setup-btn--faction active" data-faction="dwarf"  style="color:#d4a04a">Zwerge</button>
+            <button class="setup-btn setup-btn--faction active" data-faction="human" data-fc="#5ec8ff">
+              <span class="faction-emoji">👤</span>
+              <span class="faction-name">Menschen</span>
+              <span class="faction-check">✓</span>
+            </button>
+            <button class="setup-btn setup-btn--faction active" data-faction="orc" data-fc="#ff5d63">
+              <span class="faction-emoji">👹</span>
+              <span class="faction-name">Orks</span>
+              <span class="faction-check">✓</span>
+            </button>
+            <button class="setup-btn setup-btn--faction" data-faction="elf" data-fc="#6dff8a">
+              <span class="faction-emoji">🧝</span>
+              <span class="faction-name">Elfen</span>
+              <span class="faction-check">✓</span>
+            </button>
+            <button class="setup-btn setup-btn--faction" data-faction="dwarf" data-fc="#d4a04a">
+              <span class="faction-emoji">⛏️</span>
+              <span class="faction-name">Zwerge</span>
+              <span class="faction-check">✓</span>
+            </button>
           </div>
         </div>
 
