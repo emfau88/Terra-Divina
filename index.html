@@ -8,6 +8,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>Terra Divina</title>
+  <link rel="icon" type="image/png" href="/assets/brand/app-icon.png" />
+  <link rel="apple-touch-icon" href="/assets/brand/app-icon.png" />
   <link rel="stylesheet" href="/src/styles/mobile.css" />
 </head>
 <body>
@@ -27,14 +29,15 @@
 
       <!-- Kopfbereich: Logo + Titel -->
       <div id="menu-header">
+        <img id="menu-crest" src="/assets/brand/menu-crest.png" alt="" aria-hidden="true" />
         <div id="menu-title">Terra Divina</div>
-        <div id="menu-subtitle">Eine lebendige Welt erwartet dich.</div>
+        <div id="menu-subtitle">Erschaffe, lenke und zerstoere eine lebendige Welt.</div>
       </div>
 
       <!-- Hauptaktionen -->
       <div class="menu-buttons" id="menu-actions">
         <button class="menu-btn menu-btn--disabled" id="btn-continue" disabled>
-          <span class="menu-btn-icon">📖</span>
+          <span class="menu-btn-icon menu-btn-icon--continue" aria-hidden="true"></span>
           <div class="menu-btn-text">
             <span class="menu-btn-label">Fortsetzen</span>
             <span class="menu-btn-sub">Kein Spielstand vorhanden</span>
@@ -42,7 +45,7 @@
         </button>
 
         <button class="menu-btn menu-btn--primary" id="btn-new-world">
-          <span class="menu-btn-icon">🌍</span>
+          <span class="menu-btn-icon menu-btn-icon--world" aria-hidden="true"></span>
           <div class="menu-btn-text">
             <span class="menu-btn-label">Neue Welt</span>
             <span class="menu-btn-sub">Freies Sandbox-Spiel</span>
@@ -50,7 +53,7 @@
         </button>
 
         <button class="menu-btn" id="btn-scenario">
-          <span class="menu-btn-icon">⚔</span>
+          <span class="menu-btn-icon menu-btn-icon--scenario" aria-hidden="true"></span>
           <div class="menu-btn-text">
             <span class="menu-btn-label">Szenario</span>
             <span class="menu-btn-sub">30 Tage überleben</span>
@@ -58,7 +61,7 @@
         </button>
 
         <button class="menu-btn menu-btn--secondary" id="btn-options">
-          <span class="menu-btn-icon">⚙</span>
+          <span class="menu-btn-icon menu-btn-icon--options" aria-hidden="true"></span>
           <div class="menu-btn-text">
             <span class="menu-btn-label">Optionen</span>
             <span class="menu-btn-sub"></span>
@@ -94,6 +97,7 @@
 
       <div class="screen-header">
         <button class="screen-back-btn" id="btn-setup-back">← Zurück</button>
+        <img class="setup-header-crest" src="/assets/brand/setup-header-crest-small.png" alt="" aria-hidden="true" />
         <h2 class="screen-title">Neue Welt</h2>
       </div>
 
@@ -102,28 +106,28 @@
         <div class="setup-section">
           <div class="setup-label">Weltgröße</div>
           <div class="setup-row" id="setup-size">
-            <button class="setup-btn active" data-value="medium">Mittel</button>
-            <button class="setup-btn" data-value="small">Klein</button>
+            <button class="setup-btn setup-btn--with-icon active" data-value="medium"><span class="setup-icon setup-icon--size setup-icon--size-medium" aria-hidden="true"></span><span>Mittel</span></button>
+            <button class="setup-btn setup-btn--with-icon" data-value="small"><span class="setup-icon setup-icon--size setup-icon--size-small" aria-hidden="true"></span><span>Klein</span></button>
           </div>
         </div>
 
         <div class="setup-section">
           <div class="setup-label">Welttyp</div>
           <div class="setup-row" id="setup-type">
-            <button class="setup-btn active" data-value="island">Insel</button>
-            <button class="setup-btn" data-value="archipelago">Archipel</button>
-            <button class="setup-btn" data-value="forest">Wald</button>
-            <button class="setup-btn" data-value="mountain">Berge</button>
+            <button class="setup-btn setup-btn--with-icon active" data-value="island"><span class="setup-icon setup-icon--type setup-icon--type-island" aria-hidden="true"></span><span>Insel</span></button>
+            <button class="setup-btn setup-btn--with-icon" data-value="archipelago"><span class="setup-icon setup-icon--type setup-icon--type-archipelago" aria-hidden="true"></span><span>Archipel</span></button>
+            <button class="setup-btn setup-btn--with-icon" data-value="forest"><span class="setup-icon setup-icon--type setup-icon--type-forest" aria-hidden="true"></span><span>Wald</span></button>
+            <button class="setup-btn setup-btn--with-icon" data-value="mountain"><span class="setup-icon setup-icon--type setup-icon--type-mountain" aria-hidden="true"></span><span>Berge</span></button>
           </div>
         </div>
 
         <div class="setup-section">
           <div class="setup-label">Startmodus</div>
           <div class="setup-row" id="setup-mode">
-            <button class="setup-btn" data-value="peaceful">Friedlich</button>
-            <button class="setup-btn active" data-value="balanced">Ausgeglichen</button>
-            <button class="setup-btn" data-value="warTorn">Kriegslust</button>
-            <button class="setup-btn" data-value="chaos">Chaos</button>
+            <button class="setup-btn setup-btn--with-icon" data-value="peaceful"><span class="setup-icon setup-icon--mode setup-icon--mode-peaceful" aria-hidden="true"></span><span>Friedlich</span></button>
+            <button class="setup-btn setup-btn--with-icon active" data-value="balanced"><span class="setup-icon setup-icon--mode setup-icon--mode-balanced" aria-hidden="true"></span><span>Ausgeglichen</span></button>
+            <button class="setup-btn setup-btn--with-icon" data-value="warTorn"><span class="setup-icon setup-icon--mode setup-icon--mode-war" aria-hidden="true"></span><span>Kriegslust</span></button>
+            <button class="setup-btn setup-btn--with-icon" data-value="chaos"><span class="setup-icon setup-icon--mode setup-icon--mode-chaos" aria-hidden="true"></span><span>Chaos</span></button>
           </div>
         </div>
 
@@ -131,22 +135,22 @@
           <div class="setup-label">Völker <span class="setup-faction-hint">mind. 2 wählen</span></div>
           <div class="setup-row setup-row--factions" id="setup-factions">
             <button class="setup-btn setup-btn--faction active" data-faction="human" data-fc="#5ec8ff">
-              <span class="faction-emoji">👤</span>
+              <span class="faction-icon faction-icon--human" aria-hidden="true"></span>
               <span class="faction-name">Menschen</span>
               <span class="faction-check">✓</span>
             </button>
             <button class="setup-btn setup-btn--faction active" data-faction="orc" data-fc="#ff5d63">
-              <span class="faction-emoji">👹</span>
+              <span class="faction-icon faction-icon--orc" aria-hidden="true"></span>
               <span class="faction-name">Orks</span>
               <span class="faction-check">✓</span>
             </button>
             <button class="setup-btn setup-btn--faction" data-faction="elf" data-fc="#6dff8a">
-              <span class="faction-emoji">🧝</span>
+              <span class="faction-icon faction-icon--elf" aria-hidden="true"></span>
               <span class="faction-name">Elfen</span>
               <span class="faction-check">✓</span>
             </button>
             <button class="setup-btn setup-btn--faction" data-faction="dwarf" data-fc="#d4a04a">
-              <span class="faction-emoji">⛏️</span>
+              <span class="faction-icon faction-icon--dwarf" aria-hidden="true"></span>
               <span class="faction-name">Zwerge</span>
               <span class="faction-check">✓</span>
             </button>
@@ -156,14 +160,14 @@
         <div class="setup-section setup-seed-row">
           <div class="setup-label">Seed</div>
           <div class="setup-seed-value" id="setup-seed-display">123456</div>
-          <button class="setup-btn" id="btn-reseed">🔀 Neu</button>
+          <button class="setup-btn setup-btn--reseed" id="btn-reseed"><span class="seed-reroll-icon" aria-hidden="true"></span><span>Neu</span></button>
         </div>
 
       </div><!-- /.screen-body -->
 
       <div class="screen-footer">
-        <button class="menu-btn menu-btn--primary" id="btn-start-game">
-          <span class="menu-btn-icon">▶</span>
+        <button class="menu-btn menu-btn--primary setup-start-btn" id="btn-start-game">
+          <span class="setup-start-glyph" aria-hidden="true">▶</span>
           <div class="menu-btn-text">
             <span class="menu-btn-label">Welt starten</span>
             <span class="menu-btn-sub"></span>

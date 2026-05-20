@@ -268,6 +268,20 @@ html, body {
   line-height: 1;
 }
 
+.cat-icon svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.cat-icon .dock-icon-img {
+  width: 28px;
+  height: 28px;
+  display: block;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
 .cat-label {
   font-size: 8.5px;
   font-weight: 700;
@@ -352,6 +366,23 @@ html, body {
   font-weight: 700;
   line-height: 1;
   color: inherit;
+}
+
+.tool-glyph svg,
+.tool-icon svg {
+  width: 26px;
+  height: 26px;
+  display: block;
+}
+
+.tool-glyph .dock-icon-img,
+.tool-icon .dock-icon-img {
+  width: 38px;
+  height: 38px;
+  display: block;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.35);
 }
 
 .tool-label {
@@ -555,13 +586,17 @@ body.inspect-open #event-feed,
 ═══════════════════════════════════════════════════════════════════════════ */
 #main-menu {
   position: fixed; inset: 0;
-  background: linear-gradient(155deg, #07101f 0%, #0c1d38 50%, #091527 100%);
+  background:
+    linear-gradient(180deg, rgba(7,16,31,0.35) 0%, rgba(7,16,31,0.70) 52%, rgba(7,16,31,0.96) 100%),
+    linear-gradient(155deg, rgba(7,16,31,0.35) 0%, rgba(12,29,56,0.45) 50%, rgba(9,21,39,0.78) 100%),
+    url('/assets/brand/menu-splash.png') center top / cover no-repeat;
   z-index: 9000;
   display: flex;
   align-items: stretch;
   justify-content: center;
   padding-top: var(--safe-top);
   padding-bottom: var(--safe-bottom);
+  overflow: hidden;
 }
 
 #menu-inner {
@@ -571,6 +606,8 @@ body.inspect-open #event-feed,
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
+  position: relative;
+  z-index: 1;
 }
 
 #menu-header {
@@ -920,4 +957,531 @@ body.inspect-open #event-feed,
   #event-feed { max-width: 576px; left: 50%; transform: translateX(-50%); right: auto; width: 100%; }
   #inspect-panel { max-width: 576px; left: 50%; transform: translateX(-50%); right: auto; width: 100%; }
   #category-hint { font-size: 13px; }
+}
+
+/* Performance profiler */
+#perf-monitor {
+  position: fixed;
+  left: 10px;
+  top: calc(env(safe-area-inset-top, 0px) + 104px);
+  z-index: 9000;
+  min-width: 188px;
+  padding: 8px 10px;
+  border: 1px solid rgba(126, 170, 112, 0.45);
+  border-radius: 8px;
+  background: rgba(7, 12, 8, 0.82);
+  color: #dce8cf;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 10px;
+  line-height: 1.35;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.38);
+  backdrop-filter: blur(8px);
+}
+#perf-monitor.perf-monitor--hidden {
+  display: none;
+}
+#perf-monitor .perf-title {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  color: #9ddb7f;
+  font-weight: 800;
+}
+#perf-monitor .perf-title span {
+  color: #879579;
+  font-weight: 700;
+}
+#perf-monitor div:not(.perf-title) {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+#perf-monitor b {
+  color: #94a386;
+  font-weight: 700;
+}
+#perf-monitor span {
+  color: #eef9dc;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+#perf-monitor .warn {
+  color: #ffd36f;
+}
+#perf-monitor .bad {
+  color: #ff785f;
+}
+#perf-monitor hr {
+  height: 1px;
+  margin: 5px 0;
+  border: 0;
+  background: rgba(126, 170, 112, 0.22);
+}
+
+/* Setup screen asset pass */
+#setup-screen {
+  background:
+    linear-gradient(180deg, rgba(9, 8, 5, 0.26) 0%, rgba(9, 8, 5, 0.66) 100%),
+    url('/assets/brand/setup-bg.png') center center / cover no-repeat;
+}
+
+#setup-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.08) 50%, rgba(0,0,0,0.42) 100%),
+    radial-gradient(circle at 50% 14%, rgba(255, 222, 137, 0.16) 0, rgba(255, 222, 137, 0) 32%);
+  pointer-events: none;
+}
+
+#setup-screen-inner {
+  position: relative;
+  z-index: 1;
+  max-width: 560px;
+  padding: 0 clamp(10px, 3vw, 18px);
+}
+
+#setup-screen .screen-header {
+  margin: 10px 0 0;
+  padding: 12px 10px 10px;
+  border-bottom-color: rgba(232, 191, 105, 0.28);
+  background: rgba(16, 12, 8, 0.34);
+  border-radius: 8px 8px 0 0;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.setup-header-crest {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  filter: drop-shadow(0 5px 10px rgba(0,0,0,0.48));
+}
+
+#setup-screen .screen-title {
+  color: #ffe5a4;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.72);
+}
+
+#setup-screen .screen-body {
+  margin: 0 0 0;
+  padding: 14px 12px 16px;
+  gap: 14px;
+  background: linear-gradient(180deg, rgba(20, 15, 9, 0.86), rgba(10, 9, 7, 0.80));
+  border: 1px solid rgba(232, 191, 105, 0.3);
+  border-top: 0;
+  box-shadow: 0 14px 34px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+#setup-screen .screen-footer {
+  padding: 10px 0 14px;
+  border-top: 0;
+}
+
+#setup-screen .setup-label {
+  color: rgba(255, 232, 176, 0.82);
+  letter-spacing: 0.05em;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+}
+
+#setup-screen .setup-row {
+  gap: 8px;
+}
+
+#setup-screen .setup-btn {
+  min-height: 50px;
+  height: auto;
+  border-radius: 8px;
+  border-color: rgba(232, 191, 105, 0.34);
+  background: linear-gradient(180deg, rgba(67, 48, 27, 0.78), rgba(25, 19, 13, 0.82));
+  color: rgba(255, 241, 204, 0.86);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+}
+
+#setup-screen .setup-btn.active {
+  border-color: rgba(255, 219, 130, 0.82);
+  background: linear-gradient(180deg, rgba(118, 78, 31, 0.94), rgba(55, 35, 17, 0.96));
+  color: #fff5d8;
+  box-shadow:
+    0 0 0 1px rgba(255, 219, 130, 0.28),
+    0 0 18px rgba(223, 166, 62, 0.18),
+    inset 0 1px 0 rgba(255,255,255,0.16);
+}
+
+.setup-btn--with-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px 8px;
+  min-width: 92px;
+}
+
+.setup-icon,
+.faction-icon,
+.seed-reroll-icon {
+  display: block;
+  flex: 0 0 auto;
+  background-repeat: no-repeat;
+  border-radius: 7px;
+  box-shadow: 0 5px 12px rgba(0,0,0,0.3), inset 0 0 0 1px rgba(255, 230, 168, 0.18);
+}
+
+.setup-icon {
+  width: 42px;
+  height: 42px;
+  background-size: auto 100%;
+  background-position-y: 50%;
+}
+
+.setup-icon--size {
+  background-image: url('/assets/brand/world-size-icons.png');
+  background-size: 200% 100%;
+}
+.setup-icon--size-small { background-position: 0% 50%; }
+.setup-icon--size-medium { background-position: 100% 50%; }
+
+.setup-icon--type {
+  background-image: url('/assets/brand/world-type-icons.png');
+  background-size: 400% 100%;
+}
+.setup-icon--type-island { background-position: 0% 50%; }
+.setup-icon--type-archipelago { background-position: 33.333% 50%; }
+.setup-icon--type-forest { background-position: 66.666% 50%; }
+.setup-icon--type-mountain { background-position: 100% 50%; }
+
+.setup-icon--mode {
+  background-image: url('/assets/brand/start-mode-icons.png');
+  background-size: 400% 100%;
+}
+.setup-icon--mode-peaceful { background-position: 0% 50%; }
+.setup-icon--mode-balanced { background-position: 33.333% 50%; }
+.setup-icon--mode-war { background-position: 66.666% 50%; }
+.setup-icon--mode-chaos { background-position: 100% 50%; }
+
+#setup-screen .setup-row--factions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+#setup-screen .setup-btn--faction {
+  min-width: 0;
+  min-height: 92px;
+  height: auto;
+  padding: 8px 4px;
+}
+
+.faction-icon {
+  width: 46px;
+  height: 46px;
+  background-image: url('/assets/brand/faction-icons.png');
+  background-size: 400% 100%;
+}
+.faction-icon--human { background-position: 0% 50%; }
+.faction-icon--orc { background-position: 33.333% 50%; }
+.faction-icon--elf { background-position: 66.666% 50%; }
+.faction-icon--dwarf { background-position: 100% 50%; }
+
+#setup-screen .faction-name {
+  color: rgba(255, 241, 204, 0.9);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.7);
+}
+
+.setup-seed-row {
+  background: rgba(12, 10, 7, 0.42);
+  border: 1px solid rgba(232, 191, 105, 0.22);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.setup-btn--reseed {
+  max-width: 118px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.seed-reroll-icon {
+  width: 30px;
+  height: 30px;
+  background-image: url('/assets/brand/seed-reroll-icon.png');
+  background-size: cover;
+}
+
+.setup-start-btn {
+  min-height: 62px;
+  border-color: rgba(255, 221, 126, 0.82);
+  background:
+    linear-gradient(180deg, rgba(91, 54, 18, 0.25), rgba(35, 21, 11, 0.35)),
+    url('/assets/brand/start-world-button-bg.png') center center / 100% 100% no-repeat;
+  justify-content: center;
+}
+
+.setup-start-btn .menu-btn-text {
+  flex: 0 1 auto;
+}
+
+.setup-start-glyph {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(23, 15, 8, 0.48);
+  color: #ffe5a4;
+  font-size: 16px;
+  box-shadow: inset 0 0 0 1px rgba(255, 232, 166, 0.35);
+}
+
+@media (max-width: 430px) {
+  #setup-screen-inner {
+    padding: 0 8px;
+  }
+
+  .setup-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  #setup-screen .setup-row--factions {
+    gap: 7px;
+  }
+
+  .faction-icon {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+@media (max-height: 760px) {
+  #setup-screen .screen-body {
+    gap: 10px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  #setup-screen .setup-btn--faction {
+    min-height: 80px;
+  }
+}
+
+/* Main menu asset pass */
+#main-menu {
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255, 221, 136, 0.18) 0, rgba(255, 221, 136, 0) 28%),
+    linear-gradient(180deg, rgba(3, 7, 10, 0.06) 0%, rgba(5, 10, 11, 0.38) 43%, rgba(8, 9, 7, 0.92) 100%),
+    url('/assets/brand/menu-bg-v2.png') center center / cover no-repeat;
+  color: #f8edcf;
+}
+
+#main-menu::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(0,0,0,0.58) 0%, rgba(0,0,0,0.12) 36%, rgba(0,0,0,0.18) 64%, rgba(0,0,0,0.64) 100%),
+    linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0.62) 100%);
+  pointer-events: none;
+}
+
+#menu-inner {
+  max-width: 520px;
+  padding: 0 clamp(18px, 5vw, 30px);
+  scrollbar-width: none;
+}
+
+#menu-inner::-webkit-scrollbar {
+  display: none;
+}
+
+#menu-header {
+  padding-top: clamp(18px, 4.8vh, 46px);
+  padding-bottom: clamp(14px, 3.6vh, 28px);
+}
+
+#menu-crest {
+  width: clamp(112px, 32vw, 174px);
+  aspect-ratio: 1;
+  display: block;
+  margin: 0 auto clamp(8px, 1.7vh, 14px);
+  object-fit: contain;
+  filter: drop-shadow(0 12px 24px rgba(0,0,0,0.58)) drop-shadow(0 0 18px rgba(225,185,98,0.18));
+}
+
+#menu-title {
+  color: #ffe5a4;
+  font-size: clamp(36px, 10vw, 60px);
+  letter-spacing: 0;
+  text-shadow:
+    0 3px 0 rgba(64, 35, 12, 0.82),
+    0 12px 28px rgba(0, 0, 0, 0.7),
+    0 0 26px rgba(221, 165, 63, 0.28);
+}
+
+#menu-subtitle {
+  max-width: 330px;
+  margin: 10px auto 0;
+  color: rgba(255, 240, 203, 0.84);
+  font-size: clamp(12px, 3.2vw, 15px);
+  text-shadow: 0 2px 8px rgba(0,0,0,0.72);
+}
+
+#menu-actions {
+  gap: 9px;
+}
+
+.menu-btn {
+  min-height: 66px;
+  border-radius: 8px;
+  border-color: rgba(232, 191, 105, 0.38);
+  background:
+    linear-gradient(180deg, rgba(72, 52, 29, 0.82), rgba(28, 22, 15, 0.84)),
+    rgba(29, 21, 14, 0.82);
+  box-shadow:
+    0 9px 22px rgba(0,0,0,0.36),
+    inset 0 1px 0 rgba(255,255,255,0.12),
+    inset 0 -1px 0 rgba(0,0,0,0.26);
+  gap: 14px;
+  padding: 8px 16px;
+}
+
+.menu-btn:hover {
+  border-color: rgba(255, 220, 143, 0.66);
+  background:
+    linear-gradient(180deg, rgba(91, 66, 34, 0.88), rgba(35, 25, 16, 0.9)),
+    rgba(35, 25, 16, 0.9);
+}
+
+.menu-btn:active {
+  background:
+    linear-gradient(180deg, rgba(100, 70, 34, 0.96), rgba(43, 29, 17, 0.96)),
+    rgba(43, 29, 17, 0.96);
+  border-color: rgba(255, 225, 150, 0.82);
+}
+
+.menu-btn--primary {
+  border-color: rgba(255, 216, 125, 0.78);
+  background:
+    linear-gradient(180deg, rgba(128, 92, 39, 0.94), rgba(65, 42, 20, 0.96)),
+    rgba(92, 59, 26, 0.95);
+  box-shadow:
+    0 11px 28px rgba(0,0,0,0.44),
+    0 0 22px rgba(223, 166, 62, 0.22),
+    inset 0 1px 0 rgba(255,255,255,0.17);
+}
+
+.menu-btn--secondary {
+  background:
+    linear-gradient(180deg, rgba(45, 42, 34, 0.76), rgba(19, 18, 15, 0.84)),
+    rgba(23, 22, 18, 0.82);
+}
+
+.menu-btn--disabled {
+  opacity: 0.46;
+}
+
+.menu-btn-icon {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  border-radius: 8px;
+  background-image: url('/assets/brand/menu-action-icons.png');
+  background-size: 400% 100%;
+  background-repeat: no-repeat;
+  background-position: 0% 50%;
+  box-shadow:
+    0 6px 14px rgba(0,0,0,0.34),
+    inset 0 0 0 1px rgba(255, 233, 180, 0.22);
+}
+
+.menu-btn-icon--continue {
+  background-position: 0% 50%;
+  filter: grayscale(0.65) saturate(0.7);
+}
+
+.menu-btn-icon--world {
+  background-position: 33.333% 50%;
+}
+
+.menu-btn-icon--scenario {
+  background-position: 66.666% 50%;
+}
+
+.menu-btn-icon--options {
+  background-position: 100% 50%;
+}
+
+.menu-btn-label {
+  color: #fff4d4;
+  font-size: 17px;
+  letter-spacing: 0;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.7);
+}
+
+.menu-btn-sub {
+  color: rgba(239, 221, 181, 0.76);
+  font-size: 12px;
+}
+
+#options-panel {
+  border-radius: 8px;
+  border-color: rgba(232, 191, 105, 0.32);
+  background: rgba(18, 15, 11, 0.82);
+  box-shadow: 0 8px 22px rgba(0,0,0,0.34);
+}
+
+.options-version {
+  color: rgba(239, 221, 181, 0.7);
+}
+
+#menu-footer {
+  padding-top: 14px;
+}
+
+.menu-fs-hint {
+  min-height: 52px;
+  border-radius: 8px;
+  border-color: rgba(255, 216, 125, 0.72);
+  background: linear-gradient(180deg, rgba(111, 75, 30, 0.94), rgba(50, 32, 17, 0.96));
+  color: #ffe8a9;
+  letter-spacing: 0;
+  box-shadow:
+    0 10px 24px rgba(0,0,0,0.42),
+    0 0 18px rgba(223, 166, 62, 0.2),
+    inset 0 1px 0 rgba(255,255,255,0.13);
+}
+
+@media (max-height: 690px) {
+  #menu-crest {
+    width: clamp(86px, 25vw, 124px);
+  }
+
+  #menu-header {
+    padding-top: 14px;
+    padding-bottom: 12px;
+  }
+
+  .menu-btn {
+    min-height: 58px;
+  }
+
+  .menu-btn-icon {
+    width: 42px;
+    height: 42px;
+    flex-basis: 42px;
+  }
+}
+
+#setup-screen .setup-start-btn {
+  min-height: 62px;
+  border-color: rgba(255, 221, 126, 0.82);
+  background:
+    linear-gradient(180deg, rgba(91, 54, 18, 0.25), rgba(35, 21, 11, 0.35)),
+    url('/assets/brand/start-world-button-bg.png') center center / 100% 100% no-repeat;
+  justify-content: center;
 }
