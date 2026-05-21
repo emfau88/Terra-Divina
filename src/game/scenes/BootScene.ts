@@ -27,7 +27,13 @@ export class BootScene extends Phaser.Scene {
       this.load.image(`terrain-overlay-${overlay}`, `assets/terrain/overlays/18px/${overlay}.png`);
     }
 
-    for (const decor of ['tree-01', 'tree-cluster-01', 'rock-01', 'mountain-01', 'bush-01', 'flower-01']) {
+    for (const decor of [
+      'tree-01', 'tree-02', 'tree-03',
+      'tree-cluster-01', 'tree-cluster-02',
+      'rock-01', 'rock-02', 'rock-03',
+      'mountain-01', 'bush-01', 'flower-01', 'flower-02',
+      'stump-01', 'dead-tree-01', 'grass-tuft-01', 'reed-01', 'crater-small-01',
+    ]) {
       this.load.image(`terrain-decor-${decor}`, `assets/terrain/decor/18px/${decor}.png`);
     }
 

@@ -55,8 +55,14 @@ export class WorldGenerator {
 
     if (worldType === 'archipelago') {
       // Kleinere Hauptinsel für Archipel-Modus
-      rx = grid.cols * 0.28;
-      ry = grid.rows * 0.26;
+      rx = grid.cols * 0.20;
+      ry = grid.rows * 0.19;
+    } else if (worldType === 'forest') {
+      rx = grid.cols * 0.52;
+      ry = grid.rows * 0.49;
+    } else if (worldType === 'mountain') {
+      rx = grid.cols * 0.50;
+      ry = grid.rows * 0.46;
     }
 
     const cx = (grid.cols - 1) / 2;
@@ -68,8 +74,12 @@ export class WorldGenerator {
     const mountainForest = worldType === 'mountain' ? 0.08 : 0.035;
 
     // Zweite Insel-Verschiebung für Archipel-Modus
-    const archOffX = grid.cols * 0.42;
-    const archOffY = grid.rows * 0.38;
+    const archipelagoBlobs = [
+      { cx: grid.cols * 0.28, cy: grid.rows * 0.28, rx: grid.cols * 0.20, ry: grid.rows * 0.18 },
+      { cx: grid.cols * 0.62, cy: grid.rows * 0.34, rx: grid.cols * 0.22, ry: grid.rows * 0.20 },
+      { cx: grid.cols * 0.40, cy: grid.rows * 0.66, rx: grid.cols * 0.18, ry: grid.rows * 0.17 },
+      { cx: grid.cols * 0.75, cy: grid.rows * 0.70, rx: grid.cols * 0.16, ry: grid.rows * 0.15 },
+    ];
 
     for (let y = 0; y < grid.rows; y++) {
       for (let x = 0; x < grid.cols; x++) {
@@ -86,26 +96,37 @@ export class WorldGenerator {
 
         let t: TileType = TileType.Water;
 
-        if (d + n < 0.94) t = TileType.Grass;
-        if (d + n > 0.82 && d + n < 0.99) t = TileType.Sand;
+        if (worldType !== 'archipelago') {
+          if (d + n < 0.94) t = TileType.Grass;
+          if (d + n > 0.82 && d + n < 0.99) t = TileType.Sand;
+        }
 
         // Archipel: zweite Insel-Blob mit versetztem Mittelpunkt prüfen
         if (worldType === 'archipelago' && t === TileType.Water) {
-          const nx2 = (x - archOffX) / rx;
-          const ny2 = (y - archOffY) / ry;
-          const d2  = Math.sqrt(nx2 * nx2 + ny2 * ny2);
-          const n2  =
-            Math.sin(x * 0.47 + y * 0.31) * 0.05 +
-            Math.sin(x * 0.23 - y * 0.39) * 0.06 +
-            rng.next() * 0.08;
-          if (d2 + n2 < 0.94) t = TileType.Grass;
-          if (d2 + n2 > 0.82 && d2 + n2 < 0.99) t = TileType.Sand;
+          for (const blob of archipelagoBlobs) {
+            const nx2 = (x - blob.cx) / blob.rx;
+            const ny2 = (y - blob.cy) / blob.ry;
+            const d2  = Math.sqrt(nx2 * nx2 + ny2 * ny2);
+            const n2  =
+              Math.sin(x * 0.47 + y * 0.31) * 0.05 +
+              Math.sin(x * 0.23 - y * 0.39) * 0.06 +
+              rng.next() * 0.08;
+            if (d2 + n2 < 0.94) t = TileType.Grass;
+            if (d2 + n2 > 0.82 && d2 + n2 < 0.99) t = TileType.Sand;
+            if (t !== TileType.Water) break;
+          }
         }
 
         // Wald- und Bergverteilung
         if (t === TileType.Grass && rng.next() < forestChance)   t = TileType.Forest;
         if (t === TileType.Grass && rng.next() < mountainGrass)  t = TileType.Mountain;
         if (t === TileType.Forest && rng.next() < mountainForest) t = TileType.Mountain;
+        if (worldType === 'mountain' && (t === TileType.Grass || t === TileType.Forest)) {
+          const ridge =
+            Math.abs((x / grid.cols) * 0.95 - (y / grid.rows) + 0.12) +
+            Math.sin((x + y) * 0.31) * 0.035;
+          if (ridge < 0.115 && rng.next() < 0.55) t = TileType.Mountain;
+        }
 
         const i = grid.idx(x, y);
         grid.tiles[i] = t;

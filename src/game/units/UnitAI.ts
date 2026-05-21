@@ -16,6 +16,7 @@
 import { Unit }           from './Unit';
 import { CombatSystem }   from './CombatSystem';
 import { VillageManager } from '@game/factions/VillageManager';
+import { Village }        from '@game/factions/Village';
 import { WorldGrid }      from '@game/world/WorldGrid';
 import { TileType }       from '@game/world/TileTypes';
 import { FactionKey, FACTION_KEYS } from '@game/factions/Faction';
@@ -199,7 +200,7 @@ export class UnitAI {
     if (threat) {
       u.persistTicks = 0;
       // Unassign from any build site so another builder can take over
-      const v = this.villages.villages[u.faction];
+      const v = this.homeVillage(u);
       if (v) {
         for (const site of v.buildSites) {
           if (site.assignedUnitId === u.id) site.assignedUnitId = null;
@@ -217,7 +218,7 @@ export class UnitAI {
     }
 
     // ── Fix 2: Clear stale BuildSite assignments (dead units holding slots) ──
-    const v = this.villages.villages[u.faction];
+    const v = this.homeVillage(u);
     if (v) {
       for (const site of v.buildSites) {
         if (site.assignedUnitId !== null) {
@@ -271,7 +272,7 @@ export class UnitAI {
   // ─── Guard ───────────────────────────────────────────────────────────────
 
   private guardAI(u: Unit, allUnits: Unit[]): void {
-    const v = this.villages.villages[u.faction];
+    const v = this.homeVillage(u);
     if (!v) return;
 
     // Feind in der Nähe? → angreifen (reaktiv, ignoriert persistTicks)
@@ -314,7 +315,7 @@ export class UnitAI {
   // ─── Raider ──────────────────────────────────────────────────────────────
 
   private raiderAI(u: Unit, allUnits: Unit[]): void {
-    const v = this.villages.villages[u.faction];
+    const v = this.homeVillage(u);
     if (!v) return;
 
     // Im Frieden / bei Anspannung: Raider erkunden in größerem Radius
@@ -423,14 +424,14 @@ export class UnitAI {
   // ─── Hilfsbewegungen ────────────────────────────────────────────────────
 
   private returnHome(u: Unit): void {
-    const v = this.villages.villages[u.faction];
+    const v = this.homeVillage(u);
     if (!v) return;
     u.state = 'return';
     this.stepToward(u, v.x, v.y);
   }
 
   private retreatHome(u: Unit): void {
-    const v = this.villages.villages[u.faction];
+    const v = this.homeVillage(u);
     if (!v) return;
     this.stepToward(u, v.x, v.y);
   }
@@ -451,7 +452,7 @@ export class UnitAI {
     persistMin: number,
     persistMax: number,
   ): void {
-    const v = this.villages.villages[u.faction];
+    const v = this.homeVillage(u);
     if (!v) return;
 
     // Ziel beibehalten solange persistTicks > 0 und Ziel noch nicht erreicht
@@ -471,6 +472,12 @@ export class UnitAI {
   }
 
   // ─── Bewegungs-Kernel ────────────────────────────────────────────────────
+
+  private homeVillage(u: Unit): Village | undefined {
+    return u.homeVillageId !== null
+      ? this.villages.villageById(u.homeVillageId) ?? this.villages.primaryVillage(u.faction)
+      : this.villages.primaryVillage(u.faction);
+  }
 
   stepToward(u: Unit, tx: number, ty: number): void {
     const dx = Math.sign(tx - u.x);

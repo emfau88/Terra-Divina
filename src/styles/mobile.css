@@ -974,16 +974,19 @@ body.inspect-open #event-feed,
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 10px;
   line-height: 1.35;
-  pointer-events: none;
+  pointer-events: auto;
   box-shadow: 0 8px 24px rgba(0,0,0,0.38);
   backdrop-filter: blur(8px);
 }
-#perf-monitor.perf-monitor--hidden {
+#perf-monitor.perf-monitor--hidden,
+#perf-monitor-toggle.perf-monitor--hidden {
   display: none;
 }
 #perf-monitor .perf-title {
   display: flex;
+  align-items: center;
   justify-content: space-between;
+  gap: 8px;
   margin-bottom: 4px;
   color: #9ddb7f;
   font-weight: 800;
@@ -991,6 +994,36 @@ body.inspect-open #event-feed,
 #perf-monitor .perf-title span {
   color: #879579;
   font-weight: 700;
+}
+#perf-monitor .perf-title span:first-child {
+  color: #9ddb7f;
+  margin-right: auto;
+}
+#perf-monitor .perf-close,
+#perf-monitor-toggle {
+  border: 1px solid rgba(157, 219, 127, 0.42);
+  border-radius: 6px;
+  background: rgba(20, 34, 18, 0.92);
+  color: #dff7c8;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+#perf-monitor .perf-close {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  line-height: 20px;
+}
+#perf-monitor-toggle {
+  position: fixed;
+  left: 10px;
+  top: calc(env(safe-area-inset-top, 0px) + 104px);
+  z-index: 9000;
+  padding: 7px 9px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.38);
 }
 #perf-monitor div:not(.perf-title) {
   display: flex;

@@ -9,6 +9,12 @@ import { FactionKey }    from './Faction';
 import { Building }      from './Building';
 import { BuildingType }  from '@game/data/buildingDefs';
 
+let nextVillageId = 0;
+
+export function reserveVillageId(id: number): void {
+  nextVillageId = Math.max(nextVillageId, id + 1);
+}
+
 // ─── BuildSite ───────────────────────────────────────────────────────────────
 
 /**
@@ -17,6 +23,7 @@ import { BuildingType }  from '@game/data/buildingDefs';
  * Builder units walk to the site and set state = 'build' while waiting.
  */
 export interface BuildSite {
+  villageId: number;
   x: number;
   y: number;
   type: BuildingType;
@@ -28,6 +35,7 @@ export interface BuildSite {
 }
 
 export class Village {
+  readonly id: number;
   readonly faction: FactionKey;
 
   /** Mittelpunkt-Kachel des Dorfes. */
@@ -54,7 +62,9 @@ export class Village {
   // ─── Bau-Stellen (BuildSite-System) ──────────────────────────────────────
   buildSites: BuildSite[] = [];
 
-  constructor(faction: FactionKey, x: number, y: number) {
+  constructor(faction: FactionKey, x: number, y: number, id?: number) {
+    this.id      = id ?? nextVillageId++;
+    reserveVillageId(this.id);
     this.faction = faction;
     this.x       = x;
     this.y       = y;

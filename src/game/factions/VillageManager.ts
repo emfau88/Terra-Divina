@@ -13,7 +13,7 @@
 
 import { Village }           from './Village';
 import { Building }          from './Building';
-import { FACTION_KEYS, FactionKey } from './Faction';
+import { FactionKey } from './Faction';
 import { WorldGrid }         from '@game/world/WorldGrid';
 import { WorldGenerator }    from '@game/world/WorldGenerator';
 import { TileType }          from '@game/world/TileTypes';
@@ -26,6 +26,7 @@ const MIN_BUILDING_SPACING_TILES = 3;
 
 export class VillageManager {
   readonly villages: Partial<Record<FactionKey, Village>> = {};
+  readonly villageList: Village[] = [];
   readonly buildings: Building[] = [];
 
   /** Wird nach jeder Gebäudezerstörung aufgerufen (z.B. für Diplomatie + Renderer). */
@@ -127,12 +128,47 @@ export class VillageManager {
     const v = new Village(faction, x, y);
     // Fraktions-spezifischer Startvorrat (Orks wachsen schnell → mehr Startnahrung)
     v.food = faction === 'orc' ? BALANCE.STARTING_FOOD_ORC : BALANCE.STARTING_FOOD_DEFAULT;
-    this.villages[faction] = v;
+    this.registerVillage(v);
 
-    this.addBuilding(faction, 'hall',  x,     y);
-    this.addBuilding(faction, 'hut',   x - 3, y + 2);
-    this.addBuilding(faction, 'farm',  x + 3, y + 2);
-    this.makeRoads(faction);
+    this.addBuilding(faction, 'hall',  x,     y,     v.id);
+    this.addBuilding(faction, 'hut',   x - 3, y + 2, v.id);
+    this.addBuilding(faction, 'farm',  x + 3, y + 2, v.id);
+    this.makeRoadsForVillage(v.id);
+  }
+
+  registerVillage(v: Village): void {
+    if (this.villageById(v.id)) return;
+    this.villageList.push(v);
+    this.villages[v.faction] ??= v;
+  }
+
+  restoreVillage(faction: FactionKey, x: number, y: number, id: number): Village {
+    const existing = this.villageById(id);
+    if (existing) return existing;
+    const v = new Village(faction, x, y, id);
+    this.registerVillage(v);
+    return v;
+  }
+
+  foundVillage(faction: FactionKey, x: number, y: number): Village | null {
+    if (!this.grid.inBounds(x, y)) return null;
+    if (!this.grid.isWalkable(x, y)) return null;
+    if (this.hasNearbyBuilding(x, y, MIN_BUILDING_SPACING_TILES + 2)) return null;
+
+    const v = new Village(faction, x, y);
+    v.food = Math.floor(BALANCE.STARTING_FOOD_DEFAULT * 0.5);
+    v.wood = 10;
+    this.registerVillage(v);
+
+    const hall = this.addBuilding(faction, 'hall', x, y, v.id);
+    if (!hall) {
+      this.removeVillage(v);
+      return null;
+    }
+    this.addBuilding(faction, 'hut', x - 3, y + 2, v.id);
+    this.addBuilding(faction, 'farm', x + 3, y + 2, v.id);
+    this.makeRoadsForVillage(v.id);
+    return v;
   }
 
   // ─── Gebäude hinzufügen ──────────────────────────────────────────────────
@@ -142,6 +178,7 @@ export class VillageManager {
     type: BuildingType,
     x: number,
     y: number,
+    villageId?: number,
   ): Building | null {
     if (!this.grid.inBounds(x, y)) return null;
     const t = this.grid.get(x, y);
@@ -150,9 +187,12 @@ export class VillageManager {
     // Kein Gebäude auf einem belegten oder zu nahen Feld.
     if (type !== 'hall' && this.hasNearbyBuilding(x, y, MIN_BUILDING_SPACING_TILES)) return null;
 
-    const b = new Building(faction, type, x, y);
+    const v = villageId !== undefined
+      ? this.villageById(villageId)
+      : this.primaryVillage(faction);
+    const b = new Building(faction, type, x, y, v?.id ?? null);
     this.buildings.push(b);
-    this.villages[faction]?.buildings.push(b);
+    v?.buildings.push(b);
 
     // Gebäude-Kachel → Road (außer Farm bleibt Gras/Sand)
     if (type !== 'farm') {
@@ -168,7 +208,9 @@ export class VillageManager {
 
   destroyBuilding(b: Building): void {
     b.dead = true;
-    const v = this.villages[b.faction];
+    const v = b.villageId !== null
+      ? this.villageById(b.villageId)
+      : this.primaryVillage(b.faction);
     if (v) {
       const idx = v.buildings.indexOf(b);
       if (idx !== -1) v.buildings.splice(idx, 1);
@@ -182,7 +224,13 @@ export class VillageManager {
   // ─── Wege ziehen ─────────────────────────────────────────────────────────
 
   makeRoads(faction: FactionKey): void {
-    const v = this.villages[faction];
+    const v = this.primaryVillage(faction);
+    if (!v) return;
+    this.makeRoadsForVillage(v.id);
+  }
+
+  makeRoadsForVillage(villageId: number): void {
+    const v = this.villageById(villageId);
     if (!v) return;
     let changed = false;
 
@@ -242,6 +290,26 @@ export class VillageManager {
 
   /** Alle Dörfer als Array. */
   get allVillages(): Village[] {
-    return FACTION_KEYS.map(k => this.villages[k]).filter((v): v is Village => v !== undefined);
+    return this.villageList;
+  }
+
+  primaryVillage(faction: FactionKey): Village | undefined {
+    return this.villages[faction];
+  }
+
+  villageById(id: number): Village | undefined {
+    return this.villageList.find(v => v.id === id);
+  }
+
+  villagesForFaction(faction: FactionKey): Village[] {
+    return this.villageList.filter(v => v.faction === faction);
+  }
+
+  private removeVillage(v: Village): void {
+    const idx = this.villageList.indexOf(v);
+    if (idx !== -1) this.villageList.splice(idx, 1);
+    if (this.villages[v.faction] === v) {
+      this.villages[v.faction] = this.villageList.find(other => other.faction === v.faction);
+    }
   }
 }

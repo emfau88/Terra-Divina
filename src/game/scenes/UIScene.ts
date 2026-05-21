@@ -23,67 +23,67 @@ interface CategoryDef {
 const CATEGORIES: CategoryDef[] = [
   {
     key: 'destruction',
-    glyph: 'ðŸ’¥',
-    label: 'ZerstÃ¶rung',
-    hint: 'Blitz, Feuer und Meteor verÃ¤ndern die Welt mit Gewalt.',
+    glyph: '\u{1F4A5}',
+    label: 'Zerst\u00f6rung',
+    hint: 'Blitz, Feuer und Meteor ver\u00e4ndern die Welt mit Gewalt.',
     tools: [
-      { key: 'lightning', glyph: 'âš¡', label: 'Blitz'  },
-      { key: 'fire',      glyph: 'ðŸ”¥', label: 'Feuer'  },
-      { key: 'meteor',    glyph: 'â˜„ï¸',  label: 'Meteor' },
+      { key: 'lightning', glyph: '\u26a1', label: 'Blitz'  },
+      { key: 'fire',      glyph: '\u{1F525}', label: 'Feuer'  },
+      { key: 'meteor',    glyph: '\u2604\ufe0f',  label: 'Meteor' },
     ],
   },
   {
     key: 'nature',
-    glyph: 'ðŸŒ¿',
+    glyph: '\u{1F33F}',
     label: 'Natur',
     hint: 'Bringe Regen oder heile das Land.',
     tools: [
-      { key: 'rain', glyph: 'ðŸŒ§ï¸', label: 'Regen'  },
-      { key: 'heal', glyph: 'âœš',  label: 'Heilen' },
+      { key: 'rain', glyph: '\u{1F327}\ufe0f', label: 'Regen'  },
+      { key: 'heal', glyph: '\u271a',  label: 'Heilen' },
     ],
   },
   {
     key: 'civilizations',
-    glyph: 'ðŸ˜ï¸',
-    label: 'VÃ¶lker',
+    glyph: '\u{1F3D8}\ufe0f',
+    label: 'V\u00f6lker',
     hint: 'Erschaffe Zivilisationen und beobachte, wie sie wachsen.',
     tools: [
-      { key: 'human', glyph: 'ðŸ‘¤', label: 'Mensch' },
-      { key: 'orc',   glyph: 'ðŸ‘¹', label: 'Ork'    },
-      { key: 'elf',   glyph: 'ðŸ§', label: 'Elfe'   },
-      { key: 'dwarf', glyph: 'â›ï¸',  label: 'Zwerg'  },
+      { key: 'human', glyph: '\u{1F464}', label: 'Mensch' },
+      { key: 'orc',   glyph: '\u{1F479}', label: 'Ork'    },
+      { key: 'elf',   glyph: '\u{1F9DD}', label: 'Elfe'   },
+      { key: 'dwarf', glyph: '\u26cf\ufe0f',  label: 'Zwerg'  },
     ],
   },
   {
     key: 'creatures',
-    glyph: 'ðŸ¾',
+    glyph: '\u{1F43E}',
     label: 'Kreaturen',
     hint: 'Setze wilde Kreaturen in die Welt.',
     tools: [
-      { key: 'wolf',  glyph: 'ðŸº', label: 'Wolf'  },
-      { key: 'demon', glyph: 'ðŸ‘¿', label: 'DÃ¤mon' },
+      { key: 'wolf',  glyph: '\u{1F43A}', label: 'Wolf'  },
+      { key: 'demon', glyph: '\u{1F47F}', label: 'D\u00e4mon' },
     ],
   },
   {
     key: 'terrain',
-    glyph: 'ðŸ—ºï¸',
+    glyph: '\u{1F5FA}\ufe0f',
     label: 'Terrain',
     hint: 'Male das Land neu: Gras, Wasser, Wald, Berge.',
     tools: [
-      { key: 'terrain-grass',    glyph: 'ðŸŸ©', label: 'Gras'   },
-      { key: 'terrain-water',    glyph: 'ðŸŸ¦', label: 'Wasser' },
-      { key: 'terrain-forest',   glyph: 'ðŸŒ²', label: 'Wald'   },
-      { key: 'terrain-mountain', glyph: 'â›°ï¸',  label: 'Berg'   },
-      { key: 'terrain-sand',     glyph: 'ðŸŸ¨', label: 'Sand'   },
+      { key: 'terrain-grass',    glyph: '\u{1F7E9}', label: 'Gras'   },
+      { key: 'terrain-water',    glyph: '\u{1F7E6}', label: 'Wasser' },
+      { key: 'terrain-forest',   glyph: '\u{1F332}', label: 'Wald'   },
+      { key: 'terrain-mountain', glyph: '\u26f0\ufe0f',  label: 'Berg'   },
+      { key: 'terrain-sand',     glyph: '\u{1F7E8}', label: 'Sand'   },
     ],
   },
   {
     key: 'more',
-    glyph: 'â‹¯',
+    glyph: '\u22ef',
     label: 'Mehr',
     hint: 'Inspizieren, pausieren und Geschwindigkeit anpassen.',
     tools: [
-      { key: 'inspect', glyph: 'â“˜', label: 'Info' },
+      { key: 'inspect', glyph: '\u24d8', label: 'Info' },
     ],
   },
 ];
@@ -163,19 +163,19 @@ export class UIScene extends Phaser.Scene {
       <div class="hud-row hud-row--factions">
         <div class="hud-faction-chip" style="--fc:${hex(fHum.color)}">
           <span class="hud-faction-name">${fHum.short}</span>
-          <span class="hud-faction-val" id="hud-human">â€”</span>
+          <span class="hud-faction-val" id="hud-human">-</span>
         </div>
         <div class="hud-faction-chip" style="--fc:${hex(fOrc.color)}">
           <span class="hud-faction-name">${fOrc.short}</span>
-          <span class="hud-faction-val" id="hud-orc">â€”</span>
+          <span class="hud-faction-val" id="hud-orc">-</span>
         </div>
         <div class="hud-faction-chip" style="--fc:${hex(fElf.color)}">
           <span class="hud-faction-name">${fElf.short}</span>
-          <span class="hud-faction-val" id="hud-elf">â€”</span>
+          <span class="hud-faction-val" id="hud-elf">-</span>
         </div>
         <div class="hud-faction-chip" style="--fc:${hex(fDwarf.color)}">
           <span class="hud-faction-name">${fDwarf.short}</span>
-          <span class="hud-faction-val" id="hud-dwarf">â€”</span>
+          <span class="hud-faction-val" id="hud-dwarf">-</span>
         </div>
       </div>
     `;
@@ -283,7 +283,7 @@ export class UIScene extends Phaser.Scene {
     speedGroup.setAttribute('role', 'group');
     speedGroup.setAttribute('aria-label', 'Spielgeschwindigkeit');
 
-    const speedLabels = ['Ã—1', 'Ã—2', 'Ã—3', 'Ã—4'];
+    const speedLabels = ['\u00d71', '\u00d72', '\u00d73', '\u00d74'];
     this.speedBtns = speedLabels.map((label, i) => {
       const btn = document.createElement('button');
       btn.className = 'speed-btn' + (i === 0 ? ' active' : '');
@@ -373,13 +373,13 @@ export class UIScene extends Phaser.Scene {
     if (!overlay || !titleEl || !messageEl || !actionBtn) return;
 
     if (won) {
-      titleEl.textContent   = 'ðŸŒŸ Sieg!';
-      messageEl.textContent = `Die Welt hat ${GOAL_DAYS} Tage Ã¼berlebt. Gut gemacht, Gottheit!`;
+      titleEl.textContent   = '\u{1F31F} Sieg!';
+      messageEl.textContent = `Die Welt hat ${GOAL_DAYS} Tage \u00fcberlebt. Gut gemacht, Gottheit!`;
       actionBtn.textContent = 'Weiter beobachten';
     } else {
-      titleEl.textContent   = 'ðŸ’€ Niederlage';
-      messageEl.textContent = 'Alle DÃ¶rfer und Einheiten sind untergegangen. Die Welt ist verloren.';
-      actionBtn.textContent = 'SchlieÃŸen';
+      titleEl.textContent   = '\u{1F480} Niederlage';
+      messageEl.textContent = 'Alle D\u00f6rfer und Einheiten sind untergegangen. Die Welt ist verloren.';
+      actionBtn.textContent = 'Schlie\u00dfen';
     }
 
     overlay.classList.remove('hidden');

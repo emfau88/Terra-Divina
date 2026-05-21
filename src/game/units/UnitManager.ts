@@ -41,11 +41,13 @@ export class UnitManager {
     }
   }
 
-  spawnUnit(faction: FactionKey, role?: UnitRole): Unit | null {
+  spawnUnit(faction: FactionKey, role?: UnitRole, villageId?: number): Unit | null {
     const alive = this.units.filter(u => u.faction === faction && !u.dead);
     if (alive.length >= BALANCE.MAX_UNITS_PER_FACTION) return null;
 
-    const v = this.villages.villages[faction];
+    const v = villageId !== undefined
+      ? this.villages.villageById(villageId)
+      : this.villages.primaryVillage(faction);
     if (!v) return null;
 
     const chosenRole = role ?? this.chooseRole(faction);
@@ -56,7 +58,7 @@ export class UnitManager {
     );
     if (!pos) return null;
 
-    const u = new Unit(faction, chosenRole, pos.x, pos.y);
+    const u = new Unit(faction, chosenRole, pos.x, pos.y, v.id);
     u.state = 'idle';
     this.units.push(u);
     return u;
@@ -184,5 +186,9 @@ export class UnitManager {
 
   liveCount(faction: FactionKey): number {
     return this.units.filter(u => u.faction === faction && !u.dead).length;
+  }
+
+  liveCountForVillage(villageId: number): number {
+    return this.units.filter(u => u.homeVillageId === villageId && !u.dead).length;
   }
 }

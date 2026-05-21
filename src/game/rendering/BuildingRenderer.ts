@@ -15,6 +15,7 @@ import { Village }   from '@game/factions/Village';
 import { BuildSite } from '@game/factions/Village';
 import { FACTIONS, FactionKey, FACTION_KEYS } from '@game/factions/Faction';
 import { TILE, COLS, ROWS } from '@game/config';
+import { TerritorySystem } from '@game/world/TerritorySystem';
 
 export class BuildingRenderer {
   private static readonly BUILDING_DISPLAY_SIZE = {
@@ -29,6 +30,7 @@ export class BuildingRenderer {
   private readonly shadowG: Phaser.GameObjects.Graphics;
   private readonly buildingSprites = new Map<number, Phaser.GameObjects.Image>();
   private readonly siteSprites = new Map<string, Phaser.GameObjects.Image>();
+  private territorySystem: TerritorySystem | null = null;
 
   /** Alle bekannten Dörfer — werden für Territorium-Auren benötigt. */
   private villages: Partial<Record<FactionKey, Village>> = {};
@@ -54,6 +56,10 @@ export class BuildingRenderer {
 
   setVillages(villages: Partial<Record<FactionKey, Village>>): void {
     this.villages = villages;
+  }
+
+  setTerritorySystem(territorySystem: TerritorySystem): void {
+    this.territorySystem = territorySystem;
   }
 
   /** Fix 4 — called by GameScene each village-tick to sync war state. */
@@ -103,6 +109,11 @@ export class BuildingRenderer {
   // ─── Territorium-Auren ───────────────────────────────────────────────────
 
   private drawTerritoryAuras(): void {
+    if (this.territorySystem) {
+      this.drawClaimTerritoryAuras();
+      return;
+    }
+
     for (const key of FACTION_KEYS) {
       const v = this.villages[key];
       if (!v) continue;
@@ -134,6 +145,29 @@ export class BuildingRenderer {
       // Crisp rectangular border — square corners, tile-aligned
       this.shadowG.lineStyle(lineWidth, rectColor, lineAlpha);
       this.shadowG.strokeRect(left, top, w, h);
+    }
+  }
+
+  private drawClaimTerritoryAuras(): void {
+    for (const key of FACTION_KEYS) {
+      const f = FACTIONS[key];
+      const claims = this.territorySystem?.claimsForFaction(key) ?? [];
+      if (claims.length === 0) continue;
+
+      const rectColor = this.isAtWar ? 0xff4422 : f.color;
+      const fillAlpha = this.isAtWar ? 0.16     : 0.055;
+      const lineAlpha = this.isAtWar ? 0.66     : 0.32;
+      const lineWidth = this.isAtWar ? 2        : 1.25;
+
+      this.shadowG.fillStyle(rectColor, fillAlpha);
+      for (const claim of claims) {
+        this.shadowG.fillRect(claim.x * TILE, claim.y * TILE, claim.w * TILE, claim.h * TILE);
+      }
+
+      this.shadowG.lineStyle(lineWidth, rectColor, lineAlpha);
+      for (const claim of claims) {
+        this.shadowG.strokeRect(claim.x * TILE, claim.y * TILE, claim.w * TILE, claim.h * TILE);
+      }
     }
   }
 
@@ -205,7 +239,8 @@ export class BuildingRenderer {
     sprite.setTexture(key);
     sprite.setPosition(Math.round(px + TILE / 2), Math.round(py + TILE + 2));
     sprite.setDisplaySize(size, size);
-    sprite.setAlpha(Math.max(0.45, dmgAlpha));
+    sprite.setAlpha(1);
+    sprite.setTint(dmgAlpha < 0.82 ? 0xbfa082 : 0xffffff);
     sprite.setVisible(true);
     return true;
   }

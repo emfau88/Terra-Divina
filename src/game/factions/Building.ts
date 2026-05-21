@@ -14,6 +14,7 @@ let nextId = 0;
 export class Building {
   readonly id:      number;
   readonly faction: FactionKey;
+  readonly villageId: number | null;
   readonly type:    BuildingType;
   readonly x:       number;
   readonly y:       number;
@@ -24,9 +25,10 @@ export class Building {
   /** Treffer-Flash Timer in ms — Gebäude wird rot überlagert wenn > 0 (Phase 13E). */
   hitFlash: number = 0;
 
-  constructor(faction: FactionKey, type: BuildingType, x: number, y: number) {
+  constructor(faction: FactionKey, type: BuildingType, x: number, y: number, villageId: number | null = null) {
     this.id      = nextId++;
     this.faction = faction;
+    this.villageId = villageId;
     this.type    = type;
     this.x       = x;
     this.y       = y;

@@ -160,6 +160,26 @@ export class MainMenuScene extends Phaser.Scene {
     if (el) el.textContent = String(this.cfg.seed);
   }
 
+  private activeButtonValue<T extends string>(rowId: string, fallback: T): T {
+    const btn = document.querySelector<HTMLButtonElement>(`#${rowId} .setup-btn.active`);
+    return (btn?.dataset['value'] as T | undefined) ?? fallback;
+  }
+
+  private syncSetupConfigFromDom(): void {
+    this.cfg.size      = this.activeButtonValue<WorldSize>('setup-size', this.cfg.size);
+    this.cfg.worldType = this.activeButtonValue<WorldType>('setup-type', this.cfg.worldType);
+    this.cfg.startMode = this.activeButtonValue<StartMode>('setup-mode', this.cfg.startMode);
+
+    const selectedFactions: FactionKey[] = [];
+    document
+      .querySelectorAll<HTMLButtonElement>('#setup-factions .setup-btn--faction.active')
+      .forEach((btn) => {
+        const faction = btn.dataset['faction'] as FactionKey | undefined;
+        if (faction) selectedFactions.push(faction);
+      });
+    if (selectedFactions.length >= 2) this.cfg.factions = selectedFactions;
+  }
+
   // ─── Szenario-Screen ──────────────────────────────────────────────────────
 
   private openScenarioScreen(): void {
@@ -243,6 +263,8 @@ export class MainMenuScene extends Phaser.Scene {
   // ─── Spiel starten ────────────────────────────────────────────────────────
 
   private launchGame(): void {
+    this.syncSetupConfigFromDom();
+
     document.getElementById('main-menu')?.classList.add('hidden');
     document.getElementById('setup-screen')?.classList.add('hidden');
 
@@ -253,6 +275,6 @@ export class MainMenuScene extends Phaser.Scene {
       this.cfg.gameMode = gameModeEl.dataset['gameMode'] as GameMode;
     }
 
-    this.scene.start('GameScene', this.cfg);
+    this.scene.start('GameScene', { ...this.cfg, factions: [...this.cfg.factions] });
   }
 }

@@ -16,12 +16,13 @@ import { VillageManager }  from '@game/factions/VillageManager';
 import { UnitManager }     from '@game/units/UnitManager';
 import { WorldGrid }       from '@game/world/WorldGrid';
 import { TileType }        from '@game/world/TileTypes';
-import { FACTION_KEYS, FactionKey } from '@game/factions/Faction';
+import { TerritorySystem } from '@game/world/TerritorySystem';
+import { FactionKey } from '@game/factions/Faction';
 import { FACTION_TRAITS }  from '@game/factions/FactionTraits';
 import { Unit }            from '@game/units/Unit';
 import { BALANCE }         from '@game/data/balance';
 import { BuildingType }    from '@game/data/buildingDefs';
-import { BuildSite }       from '@game/factions/Village';
+import { BuildSite, Village } from '@game/factions/Village';
 
 const MIN_BUILDING_SPACING_TILES = 3;
 
@@ -37,6 +38,7 @@ export class ResourceSystem {
   private readonly villages: VillageManager;
   private readonly units:    UnitManager;
   private readonly grid:     WorldGrid;
+  private readonly territory: TerritorySystem | null;
 
   /** Callbacks die nach einem Dorf-Spawn / Gebäude-Bau aufgerufen werden,
    *  damit GameScene Renderer aktualisieren kann. */
@@ -48,33 +50,35 @@ export class ResourceSystem {
     villages: VillageManager,
     units:    UnitManager,
     grid:     WorldGrid,
+    territory?: TerritorySystem,
   ) {
-    this.villages = villages;
-    this.units    = units;
-    this.grid     = grid;
+    this.villages  = villages;
+    this.units     = units;
+    this.grid      = grid;
+    this.territory = territory ?? null;
   }
 
   // ─── Haupt-Tick ──────────────────────────────────────────────────────────
 
   tick(steps: number): void {
     for (let s = 0; s < steps; s++) {
-      for (const key of FACTION_KEYS) {
-        this.passiveIncome(key);
-        this.unitResourceTick(key);
-        this.trySpawn(key);
-        this.tryBuild(key);
-        this.tickBuildSites(key);
-        this.tryLevelUp(key);
+      for (const village of this.villages.allVillages) {
+        this.passiveIncome(village);
+      }
+      this.unitResourceTick();
+      for (const village of this.villages.allVillages) {
+        this.trySpawn(village);
+        this.tryBuild(village);
+        this.tickBuildSites(village);
+        this.tryLevelUp(village);
+        this.tryFoundVillage(village);
       }
     }
   }
 
   // ─── Passives Einkommen ──────────────────────────────────────────────────
 
-  private passiveIncome(faction: FactionKey): void {
-    const v = this.villages.villages[faction];
-    if (!v) return;
-
+  private passiveIncome(v: Village): void {
     const farms  = v.buildings.filter(b => b.type === 'farm').length;
     const yards  = v.buildings.filter(b => b.type === 'wood').length;
 
@@ -84,20 +88,17 @@ export class ResourceSystem {
 
   // ─── Einheiten-Ressourcen-Tick ───────────────────────────────────────────
 
-  private unitResourceTick(faction: FactionKey): void {
-    const v = this.villages.villages[faction];
-    if (!v) return;
-
+  private unitResourceTick(): void {
     for (const u of this.units.units) {
-      if (u.dead || u.faction !== faction) continue;
+      if (u.dead) continue;
 
-      if (u.role === 'gatherer') this.gathererTick(u, faction);
-      if (u.role === 'builder')  this.builderTick(u, faction);
+      if (u.role === 'gatherer') this.gathererTick(u, u.faction);
+      if (u.role === 'builder')  this.builderTick(u, u.faction);
     }
   }
 
   private gathererTick(u: Unit, faction: FactionKey): void {
-    const v = this.villages.villages[faction];
+    const v = this.homeVillage(u, faction);
     if (!v) return;
 
     const traits = FACTION_TRAITS[faction];
@@ -144,7 +145,7 @@ export class ResourceSystem {
   }
 
   private builderTick(u: Unit, faction: FactionKey): void {
-    const v = this.villages.villages[faction];
+    const v = this.homeVillage(u, faction);
     if (!v) return;
 
     if (u.carryFood + u.carryWood >= 2) {
@@ -176,7 +177,7 @@ export class ResourceSystem {
   }
 
   private returnHome(u: Unit, faction: FactionKey): void {
-    const v = this.villages.villages[faction];
+    const v = this.homeVillage(u, faction);
     if (!v) return;
 
     u.state = 'return';
@@ -192,26 +193,28 @@ export class ResourceSystem {
 
   // ─── Dorf-Aktionen ───────────────────────────────────────────────────────
 
-  private trySpawn(faction: FactionKey): void {
-    const v = this.villages.villages[faction];
-    if (!v) return;
+  private homeVillage(u: Unit, fallbackFaction: FactionKey): Village | undefined {
+    return u.homeVillageId !== null
+      ? this.villages.villageById(u.homeVillageId) ?? this.villages.primaryVillage(fallbackFaction)
+      : this.villages.primaryVillage(fallbackFaction);
+  }
 
+  private trySpawn(v: Village): void {
+    const faction = v.faction;
     const traits   = FACTION_TRAITS[faction];
     const spawnCost = Math.round(BALANCE.SPAWN_FOOD_COST * traits.spawnCostMult);
 
-    const pop = this.units.liveCount(faction);
-    const cap = this.popCap(faction);
-    if (v.food < spawnCost || pop >= cap) return;
+    const villagePop = this.units.liveCountForVillage(v.id);
+    const factionPop = this.units.liveCount(faction);
+    const cap = this.popCap(v);
+    if (v.food < spawnCost || villagePop >= cap || factionPop >= BALANCE.MAX_UNITS_PER_FACTION) return;
 
     v.food -= spawnCost;
-    const u = this.units.spawnUnit(faction);
+    const u = this.units.spawnUnit(faction, undefined, v.id);
     if (u) this.onSpawn?.(faction);
   }
 
-  private tryBuild(faction: FactionKey): void {
-    const v = this.villages.villages[faction];
-    if (!v) return;
-
+  private tryBuild(v: Village): void {
     const maxBuildings = 5 + v.level * 5;
     // Count finished buildings + pending build sites toward cap
     const effectiveCount = v.buildings.length + v.buildSites.length;
@@ -221,7 +224,7 @@ export class ResourceSystem {
       effectiveCount >= maxBuildings
     ) return;
 
-    const site = this.planBuildSite(faction);
+    const site = this.planBuildSite(v);
     if (!site) return;
 
     // Deduct resources and register site — building placed when site completes
@@ -229,7 +232,7 @@ export class ResourceSystem {
     v.food -= BALANCE.BUILD_FOOD_COST;
     v.buildSites.push(site);
     // Notify renderer that something has changed (scaffold needs drawing)
-    this.onBuild?.(faction);
+    this.onBuild?.(v.faction);
   }
 
   /**
@@ -237,10 +240,7 @@ export class ResourceSystem {
    * validates no existing building or BuildSite is already there,
    * and returns a new BuildSite ready to be pushed — WITHOUT placing the building.
    */
-  private planBuildSite(faction: FactionKey): BuildSite | null {
-    const v = this.villages.villages[faction];
-    if (!v) return null;
-
+  private planBuildSite(v: Village): BuildSite | null {
     const pool: BuildingType[] = [
       'hut', 'farm', 'wood', 'hut', 'farm',
       v.level >= 3 ? 'tower'    : 'hut',
@@ -254,6 +254,7 @@ export class ResourceSystem {
     for (let yy = v.y - radius; yy <= v.y + radius; yy++) {
       for (let xx = v.x - radius; xx <= v.x + radius; xx++) {
         if (!this.grid.isWalkable(xx, yy)) continue;
+        if (this.territory && !this.territory.ownsTile(v.id, xx, yy)) continue;
         if (this.villages.hasNearbyBuilding(xx, yy, MIN_BUILDING_SPACING_TILES)) continue;
         if (this.hasNearbyBuildSite(v.buildSites, xx, yy, MIN_BUILDING_SPACING_TILES)) continue;
         const d = dist(xx, yy, v.x, v.y);
@@ -267,10 +268,11 @@ export class ResourceSystem {
 
     const p = candidates[0];
     return {
+      villageId:        v.id,
       x:              p.x,
       y:              p.y,
       type,
-      faction,
+      faction:        v.faction,
       ticksRemaining: BALANCE.BUILD_SITE_TICKS,
       totalTicks:     BALANCE.BUILD_SITE_TICKS,
       assignedUnitId: null,
@@ -293,9 +295,8 @@ export class ResourceSystem {
    * When a site reaches 0, the building is placed and the site is removed.
    * This is the FALLBACK — buildings complete even without a builder present.
    */
-  private tickBuildSites(faction: FactionKey): void {
-    const v = this.villages.villages[faction];
-    if (!v || v.buildSites.length === 0) return;
+  private tickBuildSites(v: Village): void {
+    if (v.buildSites.length === 0) return;
 
     const completed: BuildSite[] = [];
 
@@ -312,29 +313,76 @@ export class ResourceSystem {
       if (idx !== -1) v.buildSites.splice(idx, 1);
 
       // Place the finished building (same as old growVillage path)
-      const b = this.villages.addBuilding(faction, site.type, site.x, site.y);
+      const b = this.villages.addBuilding(v.faction, site.type, site.x, site.y, site.villageId);
       if (b) {
-        this.villages.makeRoads(faction);
-        this.onBuild?.(faction);
+        this.villages.makeRoadsForVillage(v.id);
+        this.onBuild?.(v.faction);
       }
     }
   }
 
-  private tryLevelUp(faction: FactionKey): void {
-    const v = this.villages.villages[faction];
-    if (!v || v.level >= 8) return;
+  private tryLevelUp(v: Village): void {
+    if (v.level >= 8) return;
     if (v.wood < BALANCE.LEVEL_UP_WOOD_COST) return;
     v.wood -= BALANCE.LEVEL_UP_WOOD_COST;
     v.level++;
     // Territory grows with level: level 1 → radius 7, level 2 → 8, …, level 8 → 14.
     v.territory = 6 + v.level;
-    this.onBuild?.(faction); // Neuzeichnen — redraws the expanded territory rectangle
+    this.territory?.expandVillage(v);
+    this.onBuild?.(v.faction); // Neuzeichnen — redraws the expanded territory rectangle
   }
 
   // ─── Hilfsmethoden ───────────────────────────────────────────────────────
 
-  popCap(faction: FactionKey): number {
-    const v = this.villages.villages[faction];
+  private tryFoundVillage(v: Village): void {
+    if (!this.territory) return;
+    if (v.level < BALANCE.FOUND_VILLAGE_MIN_LEVEL) return;
+    if (this.units.liveCountForVillage(v.id) < BALANCE.FOUND_VILLAGE_MIN_POP) return;
+    if (this.villages.villagesForFaction(v.faction).length >= BALANCE.FOUND_VILLAGE_MAX_PER_FACTION) return;
+    if (v.wood < BALANCE.FOUND_VILLAGE_WOOD_COST || v.food < BALANCE.FOUND_VILLAGE_FOOD_COST) return;
+
+    const site = this.findVillageFoundingSite(v);
+    if (!site) return;
+
+    v.wood -= BALANCE.FOUND_VILLAGE_WOOD_COST;
+    v.food -= BALANCE.FOUND_VILLAGE_FOOD_COST;
+
+    const founded = this.villages.foundVillage(v.faction, site.x, site.y);
+    if (!founded) {
+      v.wood += BALANCE.FOUND_VILLAGE_WOOD_COST;
+      v.food += BALANCE.FOUND_VILLAGE_FOOD_COST;
+      return;
+    }
+    this.territory.ensureVillageClaims([founded]);
+    this.onBuild?.(v.faction);
+  }
+
+  private findVillageFoundingSite(source: Village): { x: number; y: number } | null {
+    if (!this.territory) return null;
+
+    const candidates: Array<{ x: number; y: number; score: number }> = [];
+    const existing = this.villages.allVillages;
+    for (const claim of this.territory.claimsForFaction(source.faction)) {
+      if (claim.villageId !== source.id) continue;
+      for (let y = claim.y; y < claim.y + claim.h; y++) {
+        for (let x = claim.x; x < claim.x + claim.w; x++) {
+          if (!this.grid.isWalkable(x, y)) continue;
+          if (this.villages.hasNearbyBuilding(x, y, MIN_BUILDING_SPACING_TILES + 2)) continue;
+          const nearestVillage = Math.min(...existing.map(v => dist(x, y, v.x, v.y)));
+          if (nearestVillage < BALANCE.FOUND_VILLAGE_MIN_DISTANCE) continue;
+          const sourceDistance = dist(x, y, source.x, source.y);
+          candidates.push({ x, y, score: sourceDistance + nearestVillage * 0.35 });
+        }
+      }
+    }
+
+    return candidates.sort((a, b) => b.score - a.score)[0] ?? null;
+  }
+
+  popCap(villageOrFaction: Village | FactionKey): number {
+    const v = typeof villageOrFaction === 'string'
+      ? this.villages.primaryVillage(villageOrFaction)
+      : villageOrFaction;
     if (!v) return 22;
     const huts = v.buildings.filter(b => b.type === 'hut').length;
     return Math.min(BALANCE.MAX_UNITS_PER_FACTION, 22 + v.level * 8 + huts * 6);

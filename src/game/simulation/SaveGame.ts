@@ -30,6 +30,7 @@ export interface SaveGame {
 
   /** Zustand aller Dörfer. */
   villages: Array<{
+    id?: number;
     faction: string;
     x: number;
     y: number;
@@ -45,6 +46,7 @@ export interface SaveGame {
   buildings: Array<{
     id: number;
     faction: string;
+    villageId?: number | null;
     type: string;
     x: number;
     y: number;
@@ -52,10 +54,31 @@ export interface SaveGame {
     dead: boolean;
   }>;
 
+  /** Zustand unfertiger Baustellen. Fehlt in alten Saves. */
+  buildSites?: Array<{
+    villageId?: number;
+    faction: string;
+    type: string;
+    x: number;
+    y: number;
+    ticksRemaining: number;
+    totalTicks: number;
+    assignedUnitId: number | null;
+  }>;
+
+  /** Gebiet als grobe Claim-Sektionen. Fehlt in alten Saves. */
+  territoryClaims?: Array<{
+    sx: number;
+    sy: number;
+    faction: string;
+    villageId: number;
+  }>;
+
   /** Zustand aller Einheiten. */
   units: Array<{
     id: number;
     faction: string;
+    homeVillageId?: number | null;
     role: string;
     x: number;
     y: number;

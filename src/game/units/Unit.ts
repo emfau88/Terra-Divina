@@ -37,6 +37,7 @@ export type UnitState =
 export class Unit {
   readonly id:      number;
   readonly faction: FactionKey;
+  homeVillageId:    number | null;
   role:             UnitRole;
 
   /** Kachel-Position (ganzzahlig) — wird von der KI verwendet. */
@@ -94,9 +95,10 @@ export class Unit {
    */
   persistTicks: number = 0;
 
-  constructor(faction: FactionKey, role: UnitRole, x: number, y: number) {
+  constructor(faction: FactionKey, role: UnitRole, x: number, y: number, homeVillageId: number | null = null) {
     this.id      = nextUnitId++;
     this.faction = faction;
+    this.homeVillageId = homeVillageId;
     this.role    = role;
     this.x       = x;
     this.y       = y;

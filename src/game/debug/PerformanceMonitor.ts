@@ -25,6 +25,7 @@ function fmt(ms: number): string {
 
 export class PerformanceMonitor {
   private readonly el: HTMLDivElement;
+  private readonly toggleBtn: HTMLButtonElement;
   private visible = true;
   private frames = 0;
   private windowMs = 0;
@@ -41,8 +42,19 @@ export class PerformanceMonitor {
     this.el = document.createElement('div');
     this.el.id = 'perf-monitor';
     this.el.innerHTML = 'Profiling startet...';
+
+    this.toggleBtn = document.createElement('button');
+    this.toggleBtn.id = 'perf-monitor-toggle';
+    this.toggleBtn.type = 'button';
+    this.toggleBtn.textContent = 'PERF';
+    this.toggleBtn.setAttribute('aria-label', 'Performance anzeigen');
+    this.toggleBtn.classList.add('perf-monitor--hidden');
+
     document.body.appendChild(this.el);
+    document.body.appendChild(this.toggleBtn);
     window.addEventListener('keydown', this.onKeyDown);
+    this.el.addEventListener('pointerdown', this.onPointerDown);
+    this.toggleBtn.addEventListener('pointerdown', this.onTogglePointerDown);
   }
 
   beginFrame(delta: number): void {
@@ -80,15 +92,37 @@ export class PerformanceMonitor {
 
   destroy(): void {
     window.removeEventListener('keydown', this.onKeyDown);
+    this.el.removeEventListener('pointerdown', this.onPointerDown);
+    this.toggleBtn.removeEventListener('pointerdown', this.onTogglePointerDown);
     this.el.remove();
+    this.toggleBtn.remove();
   }
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     if (event.key !== 'F3') return;
     event.preventDefault();
-    this.visible = !this.visible;
-    this.el.classList.toggle('perf-monitor--hidden', !this.visible);
+    this.setVisible(!this.visible);
   };
+
+  private readonly onPointerDown = (event: PointerEvent): void => {
+    const target = event.target as HTMLElement | null;
+    if (!target?.closest('[data-perf-close]')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.setVisible(false);
+  };
+
+  private readonly onTogglePointerDown = (event: PointerEvent): void => {
+    event.preventDefault();
+    event.stopPropagation();
+    this.setVisible(true);
+  };
+
+  private setVisible(visible: boolean): void {
+    this.visible = visible;
+    this.el.classList.toggle('perf-monitor--hidden', !visible);
+    this.toggleBtn.classList.toggle('perf-monitor--hidden', visible);
+  }
 
   private render(): void {
     const fps = this.frames / (this.windowMs / 1000);
@@ -100,7 +134,7 @@ export class PerformanceMonitor {
     const c = this.counts;
 
     this.el.innerHTML = `
-      <div class="perf-title">PERF <span>F3</span></div>
+      <div class="perf-title"><span>PERF</span><span>F3</span><button type="button" class="perf-close" data-perf-close aria-label="Performance ausblenden" title="Ausblenden">x</button></div>
       <div><b>FPS</b><span class="${fpsClass}">${fps.toFixed(0)}</span></div>
       <div><b>Frame avg/max</b><span>${fmt(avgDelta)} / ${fmt(this.deltaMax)} ms</span></div>
       <div><b>Update avg/max</b><span class="${updateClass}">${fmt(avgUpdate)} / ${fmt(this.updateMax)} ms</span></div>

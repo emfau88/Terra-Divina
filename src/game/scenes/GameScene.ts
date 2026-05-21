@@ -10,7 +10,6 @@ import { BuildingRenderer }   from '@game/rendering/BuildingRenderer';
 import { UnitRenderer }       from '@game/rendering/UnitRenderer';
 import { CameraController }   from '@game/rendering/CameraController';
 import { VillageManager }     from '@game/factions/VillageManager';
-import { Village }            from '@game/factions/Village';
 import { Building }           from '@game/factions/Building';
 import { UnitManager }        from '@game/units/UnitManager';
 import { Unit }               from '@game/units/Unit';
@@ -36,6 +35,7 @@ import { UnitState }          from '@game/units/Unit';
 import { ContactEvent }       from '@game/units/UnitAI';
 import { BALANCE }            from '@game/data/balance';
 import { TileType }           from '@game/world/TileTypes';
+import { TerritorySystem }    from '@game/world/TerritorySystem';
 import { CreatureManager }    from '@game/creatures/CreatureManager';
 import { CreatureRenderer }   from '@game/rendering/CreatureRenderer';
 import { SCENARIOS }          from '@game/simulation/ScenarioDefinition';
@@ -55,6 +55,7 @@ export class GameScene extends Phaser.Scene {
 
   private grid!:             WorldGrid;
   private villageManager!:   VillageManager;
+  private territorySystem!:  TerritorySystem;
   private unitManager!:      UnitManager;
   private clock!:            SimulationClock;
   private resourceSystem!:   ResourceSystem;
@@ -111,6 +112,8 @@ export class GameScene extends Phaser.Scene {
     // 2. Dörfer + Gebäude
     this.villageManager = new VillageManager(this.grid);
     this.villageManager.placeStartVillages(cfg.factions, cfg.gameMode);
+    this.territorySystem = new TerritorySystem(this.grid);
+    this.rebuildTerritoryClaims();
 
     // 3. Einheiten
     this.unitManager = new UnitManager(this.grid, this.villageManager);
@@ -121,7 +124,7 @@ export class GameScene extends Phaser.Scene {
 
     // 4. Simulations-Systeme
     this.clock          = new SimulationClock();
-    this.resourceSystem = new ResourceSystem(this.villageManager, this.unitManager, this.grid);
+    this.resourceSystem = new ResourceSystem(this.villageManager, this.unitManager, this.grid, this.territorySystem);
     this.hungerSystem   = new HungerSystem(this.villageManager, this.unitManager);
     this.diplomacy      = new DiplomacySystem(this.villageManager, this.unitManager);
     this.fireSystem     = new FireSystem(this.grid, this.unitManager);
@@ -185,7 +188,7 @@ export class GameScene extends Phaser.Scene {
       this.flushTerrainDirty();
     };
     this.resourceSystem.onBuild = (faction) => {
-      this.buildingRenderer.drawAll(this.villageManager.liveBuildings);
+      this.redrawBuildings();
       const fc  = FACTIONS[faction];
       const css = '#' + fc.color.toString(16).padStart(6, '0');
       this.eventFeed.push(`${fc.short} baut Gebäude (L${this.villageManager.villages[faction]?.level ?? 1})`, css);
@@ -195,7 +198,7 @@ export class GameScene extends Phaser.Scene {
     };
     this.villageManager.onBuildingDestroyed = () => {
       this.diplomacy.addTension(12);
-      this.buildingRenderer.drawAll(this.villageManager.liveBuildings);
+      this.redrawBuildings();
       this.eventFeed.push('Ein Gebäude wurde zerstört!', '#ff9944');
     };
     this.diplomacy.onStateChange = (state: DiplomaticState) => {
@@ -226,7 +229,7 @@ export class GameScene extends Phaser.Scene {
 
       // Fix 4 — sync war state to BuildingRenderer for territory pulse.
       this.buildingRenderer.setWarState(this.diplomacy.isWar);
-      this.buildingRenderer.drawAll(this.villageManager.liveBuildings);
+      this.redrawBuildings();
     };
 
     // 7. Kamera
@@ -247,6 +250,7 @@ export class GameScene extends Phaser.Scene {
 
     this.buildingRenderer = new BuildingRenderer(this, buildG, shadowG);
     this.buildingRenderer.setVillages(this.villageManager.villages);
+    this.buildingRenderer.setTerritorySystem(this.territorySystem);
     this.buildingRenderer.drawAll(this.villageManager.liveBuildings);
 
     this.unitRenderer = new UnitRenderer(this, unitG);
@@ -648,7 +652,12 @@ export class GameScene extends Phaser.Scene {
     this.perfMonitor.countRedraw('world');
   }
 
+  private rebuildTerritoryClaims(): void {
+    this.territorySystem.ensureVillageClaims(this.villageManager.allVillages);
+  }
+
   private redrawBuildings(): void {
+    this.rebuildTerritoryClaims();
     this.perfMonitor.measure('render', () => this.buildingRenderer.drawAll(this.villageManager.liveBuildings));
     this.perfMonitor.countRedraw('buildings');
   }
@@ -720,9 +729,9 @@ export class GameScene extends Phaser.Scene {
           decor:   m.decor,
         })),
       },
-      villages: Object.values(this.villageManager.villages)
-        .filter((v): v is Village => v !== undefined)
+      villages: this.villageManager.allVillages
         .map(v => ({
+          id:        v.id,
           faction:   v.faction,
           x:         v.x,
           y:         v.y,
@@ -736,15 +745,30 @@ export class GameScene extends Phaser.Scene {
       buildings: this.villageManager.buildings.map(b => ({
         id:      b.id,
         faction: b.faction,
+        villageId: b.villageId,
         type:    b.type,
         x:       b.x,
         y:       b.y,
         hp:      b.hp,
         dead:    b.dead,
       })),
+      buildSites: this.villageManager.allVillages.flatMap(v =>
+        v.buildSites.map(site => ({
+          villageId:        site.villageId,
+          faction:          site.faction,
+          type:             site.type,
+          x:                site.x,
+          y:                site.y,
+          ticksRemaining:   site.ticksRemaining,
+          totalTicks:       site.totalTicks,
+          assignedUnitId:   site.assignedUnitId,
+        })),
+      ),
+      territoryClaims: this.territorySystem.serialize(),
       units: this.unitManager.units.map(u => ({
         id:        u.id,
         faction:   u.faction,
+        homeVillageId: u.homeVillageId,
         role:      u.role,
         x:         u.x,
         y:         u.y,
@@ -795,7 +819,14 @@ export class GameScene extends Phaser.Scene {
 
     // ── Dorf-Felder wiederherstellen ─────────────────────────────────────────
     for (const sv of save.villages) {
-      const v = this.villageManager.villages[sv.faction as FactionKey];
+      if (sv.id !== undefined) {
+        this.villageManager.restoreVillage(sv.faction as FactionKey, sv.x, sv.y, sv.id);
+      }
+    }
+    for (const sv of save.villages) {
+      const v = sv.id !== undefined
+        ? this.villageManager.villageById(sv.id) ?? this.villageManager.primaryVillage(sv.faction as FactionKey)
+        : this.villageManager.primaryVillage(sv.faction as FactionKey);
       if (!v) continue;
       v.food      = sv.food;
       v.wood      = sv.wood;
@@ -807,6 +838,17 @@ export class GameScene extends Phaser.Scene {
 
     // ── Gebäude wiederherstellen ─────────────────────────────────────────────
     // Vorhandene Arrays leeren
+    if (save.territoryClaims && save.territoryClaims.length > 0) {
+      this.territorySystem.loadClaims(save.territoryClaims.map(claim => ({
+        sx: claim.sx,
+        sy: claim.sy,
+        faction: claim.faction as FactionKey,
+        villageId: claim.villageId,
+      })));
+    } else {
+      this.territorySystem.rebuildFromVillages(this.villageManager.allVillages);
+    }
+
     this.villageManager.buildings.length = 0;
     for (const v of this.villageManager.allVillages) {
       v.buildings.length = 0;
@@ -818,16 +860,41 @@ export class GameScene extends Phaser.Scene {
         sb.type    as BuildingType,
         sb.x,
         sb.y,
+        sb.villageId ?? this.villageManager.primaryVillage(sb.faction as FactionKey)?.id ?? null,
       );
       b.hp   = sb.hp;
       b.dead = sb.dead;
       this.villageManager.buildings.push(b);
       if (!sb.dead) {
-        this.villageManager.villages[sb.faction as FactionKey]?.buildings.push(b);
+        const village = b.villageId !== null
+          ? this.villageManager.villageById(b.villageId)
+          : this.villageManager.primaryVillage(sb.faction as FactionKey);
+        village?.buildings.push(b);
       }
     }
 
     // ── Einheiten wiederherstellen ───────────────────────────────────────────
+    for (const v of this.villageManager.allVillages) {
+      v.buildSites.length = 0;
+    }
+    for (const ss of save.buildSites ?? []) {
+      const faction = ss.faction as FactionKey;
+      const village = ss.villageId !== undefined
+        ? this.villageManager.villageById(ss.villageId)
+        : this.villageManager.primaryVillage(faction);
+      if (!village) continue;
+      village.buildSites.push({
+        villageId: ss.villageId ?? village.id,
+        faction,
+        type: ss.type as BuildingType,
+        x: ss.x,
+        y: ss.y,
+        ticksRemaining: ss.ticksRemaining,
+        totalTicks: ss.totalTicks,
+        assignedUnitId: ss.assignedUnitId,
+      });
+    }
+
     // Vorhandenes Array leeren
     this.unitManager.units.length = 0;
 
@@ -837,6 +904,7 @@ export class GameScene extends Phaser.Scene {
         su.role    as UnitRole,
         su.x,
         su.y,
+        su.homeVillageId ?? this.villageManager.primaryVillage(su.faction as FactionKey)?.id ?? null,
       );
       u.hp        = su.hp;
       u.maxHp     = su.maxHp;
@@ -869,7 +937,7 @@ export class GameScene extends Phaser.Scene {
     // ── Renderer neu zeichnen ────────────────────────────────────────────────
     this.worldRenderer.drawAll();
     this.grid.clearDirtyTiles();
-    this.buildingRenderer.drawAll(this.villageManager.liveBuildings);
+    this.redrawBuildings();
     this.unitRenderer.drawAll(this.unitManager.liveUnits);
   }
 

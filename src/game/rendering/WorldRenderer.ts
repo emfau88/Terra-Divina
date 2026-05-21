@@ -146,10 +146,33 @@ export class WorldRenderer {
     py: number,
   ): void {
     let key = '';
-    if (t === TileType.Forest) key = variant > 0.48 ? 'terrain-decor-tree-cluster-01' : 'terrain-decor-tree-01';
-    else if (t === TileType.Mountain) key = variant > 0.42 ? 'terrain-decor-mountain-01' : 'terrain-decor-rock-01';
-    else if (decor && t === TileType.Grass) key = variant > 0.5 ? 'terrain-decor-bush-01' : 'terrain-decor-flower-01';
-    else if (decor && t === TileType.Sand) key = 'terrain-decor-rock-01';
+    if (t === TileType.Forest) {
+      if (variant > 0.78) key = 'terrain-decor-tree-cluster-02';
+      else if (variant > 0.56) key = 'terrain-decor-tree-cluster-01';
+      else if (variant > 0.36) key = 'terrain-decor-tree-02';
+      else if (variant > 0.16) key = 'terrain-decor-tree-03';
+      else key = 'terrain-decor-tree-01';
+    } else if (t === TileType.Mountain) {
+      if (variant > 0.76) key = 'terrain-decor-mountain-01';
+      else if (variant > 0.50) key = 'terrain-decor-rock-03';
+      else if (variant > 0.25) key = 'terrain-decor-rock-02';
+      else key = 'terrain-decor-rock-01';
+    } else if (decor && t === TileType.Grass) {
+      if (variant > 0.86) key = 'terrain-decor-stump-01';
+      else if (variant > 0.64) key = 'terrain-decor-bush-01';
+      else if (variant > 0.42) key = 'terrain-decor-grass-tuft-01';
+      else if (variant > 0.22) key = 'terrain-decor-flower-02';
+      else key = 'terrain-decor-flower-01';
+    } else if (decor && t === TileType.Sand) {
+      key = variant > 0.55 ? 'terrain-decor-rock-02' : 'terrain-decor-rock-01';
+    } else if (decor && t === TileType.Ash) {
+      if (variant > 0.76) key = 'terrain-decor-dead-tree-01';
+      else if (variant > 0.50) key = 'terrain-decor-crater-small-01';
+      else if (variant > 0.28) key = 'terrain-decor-stump-01';
+      else key = 'terrain-decor-rock-03';
+    } else if (decor && t === TileType.Water) {
+      key = variant > 0.82 ? 'terrain-decor-reed-01' : '';
+    }
 
     if (key && this.mapG.scene.textures.exists(key)) {
       const jitterX = ((x * 5 + y * 3) % 3) - 1;
