@@ -32,6 +32,8 @@ export class WorldGrid {
   readonly tiles: TileType[];
   /** Metadaten parallel zu `tiles`. */
   readonly meta: TileMeta[];
+  /** Terrain-Änderungen seit dem letzten Render-Flush. */
+  private readonly dirtyTiles = new Set<number>();
 
   readonly cols: number;
   readonly rows: number;
@@ -76,13 +78,28 @@ export class WorldGrid {
   set(x: number, y: number, type: TileType): void {
     if (!this.inBounds(x, y)) return;
     const i = this.idx(x, y);
+    if (this.tiles[i] === type) return;
     this.tiles[i] = type;
     this.meta[i].variant = Math.random();
+    this.dirtyTiles.add(i);
   }
 
   setMeta(x: number, y: number, patch: Partial<TileMeta>): void {
     if (!this.inBounds(x, y)) return;
     Object.assign(this.meta[this.idx(x, y)], patch);
+  }
+
+  consumeDirtyTiles(): Array<{ x: number; y: number }> {
+    const out = Array.from(this.dirtyTiles, i => ({
+      x: i % this.cols,
+      y: Math.floor(i / this.cols),
+    }));
+    this.dirtyTiles.clear();
+    return out;
+  }
+
+  clearDirtyTiles(): void {
+    this.dirtyTiles.clear();
   }
 
   // ─── Hilfsmethoden ───────────────────────────────────────────────────────

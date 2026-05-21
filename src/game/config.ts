@@ -57,5 +57,5 @@ export const ROWS = 82;
 // ─── Camera zoom limits ───────────────────────────────────────────────────
 
 export const ZOOM_MIN = 0.72;
-export const ZOOM_MAX = 1.85;
+export const ZOOM_MAX = 2.4;
 export const ZOOM_DEFAULT = 1.05;

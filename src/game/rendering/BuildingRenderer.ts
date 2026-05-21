@@ -17,8 +17,18 @@ import { FACTIONS, FactionKey, FACTION_KEYS } from '@game/factions/Faction';
 import { TILE, COLS, ROWS } from '@game/config';
 
 export class BuildingRenderer {
+  private static readonly BUILDING_DISPLAY_SIZE = {
+    hall: 61,
+    tower: 48,
+    default: 52,
+    buildSite: 50,
+  } as const;
+
+  private readonly scene:   Phaser.Scene;
   private readonly buildG:  Phaser.GameObjects.Graphics;
   private readonly shadowG: Phaser.GameObjects.Graphics;
+  private readonly buildingSprites = new Map<number, Phaser.GameObjects.Image>();
+  private readonly siteSprites = new Map<string, Phaser.GameObjects.Image>();
 
   /** Alle bekannten Dörfer — werden für Territorium-Auren benötigt. */
   private villages: Partial<Record<FactionKey, Village>> = {};
@@ -31,9 +41,11 @@ export class BuildingRenderer {
   isAtWar: boolean = false;
 
   constructor(
+    scene:          Phaser.Scene,
     buildGraphics:  Phaser.GameObjects.Graphics,
     shadowGraphics: Phaser.GameObjects.Graphics,
   ) {
+    this.scene   = scene;
     this.buildG  = buildGraphics;
     this.shadowG = shadowGraphics;
   }
@@ -56,17 +68,34 @@ export class BuildingRenderer {
 
     this.drawTerritoryAuras();
 
+    const liveBuildingIds = new Set<number>();
     for (const b of buildings) {
       if (b.dead) continue;
+      liveBuildingIds.add(b.id);
       this.drawBuilding(b);
     }
 
+    const liveSiteKeys = new Set<string>();
     // Draw all active BuildSites as scaffolding
     for (const key of FACTION_KEYS) {
       const v = this.villages[key];
       if (!v || v.buildSites.length === 0) continue;
       for (const site of v.buildSites) {
+        liveSiteKeys.add(this.buildSiteKey(site));
         this.drawBuildSite(site);
+      }
+    }
+
+    for (const [id, sprite] of this.buildingSprites) {
+      if (!liveBuildingIds.has(id)) {
+        sprite.destroy();
+        this.buildingSprites.delete(id);
+      }
+    }
+    for (const [key, sprite] of this.siteSprites) {
+      if (!liveSiteKeys.has(key)) {
+        sprite.destroy();
+        this.siteSprites.delete(key);
       }
     }
   }
@@ -119,19 +148,24 @@ export class BuildingRenderer {
 
     // Boden-Schatten
     this.shadowG.fillStyle(0x000000, 0.24);
-    this.shadowG.fillEllipse(px + 9, py + 15, 18, 7);
+    this.shadowG.fillEllipse(px + 9, py + 15, 24, 9);
 
     // Schadensindikator: Gebäude werden dunkler je beschädigter
     const dmgAlpha = 0.5 + 0.5 * (b.hp / b.maxHp);
 
-    switch (b.type) {
-      case 'hall':     this.drawHall(g, px, py, c, dmgAlpha);     break;
-      case 'hut':      this.drawHut(g, px, py, c, dmgAlpha);      break;
-      case 'farm':     this.drawFarm(g, px, py, dmgAlpha);         break;
-      case 'wood':     this.drawWood(g, px, py, dmgAlpha);         break;
-      case 'tower':    this.drawTower(g, px, py, c, dmgAlpha);    break;
-      case 'outpost':  this.drawOutpost(g, px, py, c, dmgAlpha);  break;
-      case 'barracks': this.drawBarracks(g, px, py, c, dmgAlpha); break;
+    const key = b.hp < b.maxHp * 0.22 && !b.isIndestructible ? 'building-ruin' : `building-${b.type}`;
+    if (this.updateBuildingSprite(b, key, px, py, dmgAlpha)) {
+      this.drawFactionMark(px, py, f.color);
+    } else {
+      switch (b.type) {
+        case 'hall':     this.drawHall(g, px, py, c, dmgAlpha);     break;
+        case 'hut':      this.drawHut(g, px, py, c, dmgAlpha);      break;
+        case 'farm':     this.drawFarm(g, px, py, dmgAlpha);        break;
+        case 'wood':     this.drawWood(g, px, py, dmgAlpha);        break;
+        case 'tower':    this.drawTower(g, px, py, c, dmgAlpha);    break;
+        case 'outpost':  this.drawOutpost(g, px, py, c, dmgAlpha);  break;
+        case 'barracks': this.drawBarracks(g, px, py, c, dmgAlpha); break;
+      }
     }
 
     // Treffer-Flash: rote halbtransparente Überlagerung über der Kachel (Phase 13E)
@@ -139,6 +173,41 @@ export class BuildingRenderer {
       g.fillStyle(0xff3333, 0.35);
       g.fillRect(px, py, TILE, TILE);
     }
+  }
+
+  private drawFactionMark(px: number, py: number, color: number): void {
+    this.buildG.fillStyle(color, 0.92);
+    this.buildG.fillCircle(px + 14, py + 4, 2);
+  }
+
+  private updateBuildingSprite(
+    b: Building,
+    key: string,
+    px: number,
+    py: number,
+    dmgAlpha: number,
+  ): boolean {
+    if (!this.scene.textures.exists(key)) return false;
+
+    let sprite = this.buildingSprites.get(b.id);
+    if (!sprite) {
+      sprite = this.scene.add.image(px, py, key);
+      sprite.setDepth(39);
+      sprite.setOrigin(0.5, 1);
+      this.buildingSprites.set(b.id, sprite);
+    }
+
+    const size = b.type === 'hall'
+      ? BuildingRenderer.BUILDING_DISPLAY_SIZE.hall
+      : b.type === 'tower'
+        ? BuildingRenderer.BUILDING_DISPLAY_SIZE.tower
+        : BuildingRenderer.BUILDING_DISPLAY_SIZE.default;
+    sprite.setTexture(key);
+    sprite.setPosition(Math.round(px + TILE / 2), Math.round(py + TILE + 2));
+    sprite.setDisplaySize(size, size);
+    sprite.setAlpha(Math.max(0.45, dmgAlpha));
+    sprite.setVisible(true);
+    return true;
   }
 
   // ─── Gebäude-Silhouetten (aus Referenz-Prototyp portiert) ────────────────
@@ -245,11 +314,12 @@ export class BuildingRenderer {
 
     // Ground shadow (subtle)
     this.shadowG.fillStyle(0x000000, 0.15);
-    this.shadowG.fillEllipse(px + 9, py + 14, 14, 5);
+    this.shadowG.fillEllipse(px + 9, py + 14, 22, 8);
 
     // Dark fill — 30% alpha
-    g.fillStyle(0x111111, 0.3);
-    g.fillRect(px + ox, py + ox, size, size);
+    if (!this.updateBuildSiteSprite(site, px, py)) {
+      g.fillStyle(0x111111, 0.3);
+      g.fillRect(px + ox, py + ox, size, size);
 
     // Scaffold border — faction color at 60% alpha
     g.lineStyle(1.5, f.color, 0.6);
@@ -258,7 +328,8 @@ export class BuildingRenderer {
     // Diagonal scaffold lines (give it a construction-site feel)
     g.lineStyle(1, f.color, 0.25);
     g.lineBetween(px + ox,        py + ox,        px + ox + size, py + ox + size);
-    g.lineBetween(px + ox + size, py + ox,        px + ox,        py + ox + size);
+      g.lineBetween(px + ox + size, py + ox,        px + ox,        py + ox + size);
+    }
 
     // Progress bar (top of tile, above scaffold box)
     const barW    = size;
@@ -274,5 +345,30 @@ export class BuildingRenderer {
     // Bar fill — faction color
     g.fillStyle(f.color, 0.9);
     g.fillRect(barX, barY, Math.floor(barW * progress), barH);
+  }
+
+  private updateBuildSiteSprite(site: BuildSite, px: number, py: number): boolean {
+    if (!this.scene.textures.exists('building-buildsite')) return false;
+
+    const key = this.buildSiteKey(site);
+    let sprite = this.siteSprites.get(key);
+    if (!sprite) {
+      sprite = this.scene.add.image(px, py, 'building-buildsite');
+      sprite.setDepth(38);
+      sprite.setOrigin(0.5, 1);
+      this.siteSprites.set(key, sprite);
+    }
+
+    sprite.setPosition(Math.round(px + TILE / 2), Math.round(py + TILE + 1));
+    sprite.setDisplaySize(
+      BuildingRenderer.BUILDING_DISPLAY_SIZE.buildSite,
+      BuildingRenderer.BUILDING_DISPLAY_SIZE.buildSite,
+    );
+    sprite.setVisible(true);
+    return true;
+  }
+
+  private buildSiteKey(site: BuildSite): string {
+    return `${site.faction}:${site.type}:${site.x}:${site.y}`;
   }
 }

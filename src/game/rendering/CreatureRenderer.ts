@@ -1,13 +1,8 @@
 /**
- * CreatureRenderer — Phase 19
+ * CreatureRenderer
  *
- * Zeichnet Wolves und Demons als farbige Formen mit HP-Balken.
- * Nutzt ein eigenes Graphics-Objekt (creatureG), das über unitG liegt.
- *
- * Wolf:  dunkelgrauer Kreis mit spitzen Ohren-Dreiecken, gelbe Augen
- * Demon: dunkelroter Rautenkreis mit orangenem Glühen, Hörner
- *
- * Kein Phaser-State — nur reine Zeichenoperationen.
+ * Uses generated creature sprites when available and keeps Graphics HP bars
+ * plus shape fallbacks.
  */
 
 import Phaser from 'phaser';
@@ -21,103 +16,116 @@ const DEMON_DARK  = 0x880000;
 const DEMON_GLOW  = 0xff6600;
 
 export class CreatureRenderer {
-  private readonly g: Phaser.GameObjects.Graphics;
+  private static readonly CREATURE_DISPLAY_SIZE = {
+    wolf: 22,
+    demon: 27,
+  } as const;
 
-  constructor(graphics: Phaser.GameObjects.Graphics) {
+  private readonly scene: Phaser.Scene;
+  private readonly g: Phaser.GameObjects.Graphics;
+  private readonly sprites = new Map<number, Phaser.GameObjects.Image>();
+
+  constructor(scene: Phaser.Scene, graphics: Phaser.GameObjects.Graphics) {
+    this.scene = scene;
     this.g = graphics;
+    this.g.setDepth(70);
   }
 
   drawAll(creatures: Creature[]): void {
+    const liveIds = new Set<number>();
     this.g.clear();
+
     for (const c of creatures) {
       if (c.dead) continue;
-      switch (c.type) {
-        case 'wolf':  this.drawWolf(c);  break;
-        case 'demon': this.drawDemon(c); break;
+      liveIds.add(c.id);
+      this.drawCreature(c);
+    }
+
+    for (const [id, sprite] of this.sprites) {
+      if (!liveIds.has(id)) {
+        sprite.destroy();
+        this.sprites.delete(id);
       }
     }
   }
 
-  // ─── Wolf ──────────────────────────────────────────────────────────────
-
-  private drawWolf(c: Creature): void {
-    const g  = this.g;
+  private drawCreature(c: Creature): void {
     const px = c.visualX;
     const py = c.visualY;
+    const spriteDrawn = this.updateSprite(c, px, py);
 
-    // Schatten
+    if (!spriteDrawn) {
+      if (c.type === 'wolf') this.drawWolfFallback(px, py);
+      else this.drawDemonFallback(px, py);
+    }
+
+    this.drawHpBar(c, px, py);
+  }
+
+  private updateSprite(c: Creature, px: number, py: number): boolean {
+    const key = `creature-${c.type}`;
+    if (!this.scene.textures.exists(key)) return false;
+
+    let sprite = this.sprites.get(c.id);
+    if (!sprite) {
+      sprite = this.scene.add.image(px, py, key);
+      sprite.setOrigin(0.5, 0.72);
+      sprite.setDepth(69);
+      this.sprites.set(c.id, sprite);
+    }
+
+    sprite.setTexture(key);
+    sprite.setPosition(Math.round(px), Math.round(py + 4));
+    const size = CreatureRenderer.CREATURE_DISPLAY_SIZE[c.type];
+    sprite.setDisplaySize(size, size);
+    sprite.setVisible(true);
+    return true;
+  }
+
+  private drawWolfFallback(px: number, py: number): void {
+    const g = this.g;
     g.fillStyle(0x000000, 0.22);
     g.fillEllipse(px, py + 6, 14, 5);
-
-    // Körper
     g.fillStyle(WOLF_COLOR, 1);
     g.fillCircle(px, py, 7);
-
-    // Ohren (zwei kleine Dreiecke)
     g.fillStyle(WOLF_DARK, 1);
     g.fillTriangle(px - 5, py - 5, px - 2, py - 10, px, py - 5);
     g.fillTriangle(px + 5, py - 5, px + 2, py - 10, px, py - 5);
-
-    // Augen (gelb)
     g.fillStyle(0xffee44, 1);
     g.fillCircle(px - 2, py - 1, 1.2);
     g.fillCircle(px + 2, py - 1, 1.2);
-
-    // HP-Balken
-    this.drawHpBar(c, px, py);
   }
 
-  // ─── Demon ─────────────────────────────────────────────────────────────
-
-  private drawDemon(c: Creature): void {
-    const g  = this.g;
-    const px = c.visualX;
-    const py = c.visualY;
-
-    // Glühen (orangener Kreis dahinter)
+  private drawDemonFallback(px: number, py: number): void {
+    const g = this.g;
     g.fillStyle(DEMON_GLOW, 0.35);
     g.fillCircle(px, py, 11);
-
-    // Schatten
     g.fillStyle(0x000000, 0.30);
     g.fillEllipse(px, py + 7, 16, 6);
-
-    // Körper (Raute aus 2 Dreiecken)
     g.fillStyle(DEMON_COLOR, 1);
     g.fillTriangle(px, py - 9, px + 7, py, px, py + 9);
     g.fillTriangle(px, py - 9, px - 7, py, px, py + 9);
-
-    // Hörner
     g.fillStyle(DEMON_DARK, 1);
     g.fillTriangle(px - 5, py - 7, px - 3, py - 14, px - 1, py - 7);
     g.fillTriangle(px + 5, py - 7, px + 3, py - 14, px + 1, py - 7);
-
-    // Augen (weiß-rot)
     g.fillStyle(0xff4444, 1);
     g.fillCircle(px - 2, py - 1, 1.5);
     g.fillCircle(px + 2, py - 1, 1.5);
-
-    // HP-Balken
-    this.drawHpBar(c, px, py);
   }
 
-  // ─── HP-Balken ────────────────────────────────────────────────────────
-
   private drawHpBar(c: Creature, px: number, py: number): void {
-    const g      = this.g;
-    const barW   = TILE - 2;
-    const barH   = 2;
-    const barX   = px - barW / 2;
-    const barY   = py - 12;
-    const ratio  = Math.max(0, c.hp / c.maxHp);
+    const g = this.g;
+    const barW = TILE - 2;
+    const barH = 2;
+    const barX = px - barW / 2;
+    const barY = py - 14;
+    const ratio = Math.max(0, c.hp / c.maxHp);
 
-    // Hintergrund
+    if (ratio >= 1) return;
+
     g.fillStyle(0x000000, 0.6);
     g.fillRect(barX, barY, barW, barH);
-
-    // Füllung
-    const barColor = c.type === 'wolf' ? 0xaaaaaa : 0xff4444;
-    g.fillStyle(barColor, 1);
+    g.fillStyle(c.type === 'wolf' ? 0xaaaaaa : 0xff4444, 1);
     g.fillRect(barX, barY, barW * ratio, barH);
   }
 }

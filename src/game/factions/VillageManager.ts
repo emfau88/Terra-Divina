@@ -22,12 +22,16 @@ import { BuildingType }      from '@game/data/buildingDefs';
 import { BALANCE }           from '@game/data/balance';
 import { GameMode }          from '@game/world/WorldSetupConfig';
 
+const MIN_BUILDING_SPACING_TILES = 3;
+
 export class VillageManager {
   readonly villages: Partial<Record<FactionKey, Village>> = {};
   readonly buildings: Building[] = [];
 
   /** Wird nach jeder Gebäudezerstörung aufgerufen (z.B. für Diplomatie + Renderer). */
   onBuildingDestroyed: (() => void) | null = null;
+  /** Wird nur bei echten Terrain-Mutationen ausgelöst. */
+  onTerrainChanged: (() => void) | null = null;
 
   private readonly grid: WorldGrid;
 
@@ -126,8 +130,8 @@ export class VillageManager {
     this.villages[faction] = v;
 
     this.addBuilding(faction, 'hall',  x,     y);
-    this.addBuilding(faction, 'hut',   x - 1, y + 1);
-    this.addBuilding(faction, 'farm',  x + 1, y + 1);
+    this.addBuilding(faction, 'hut',   x - 3, y + 2);
+    this.addBuilding(faction, 'farm',  x + 3, y + 2);
     this.makeRoads(faction);
   }
 
@@ -143,8 +147,8 @@ export class VillageManager {
     const t = this.grid.get(x, y);
     if (t === TileType.Water || t === TileType.Mountain) return null;
 
-    // Kein Gebäude auf einem belegten Feld (außer Hall)
-    if (type !== 'hall' && this.buildingAt(x, y)) return null;
+    // Kein Gebäude auf einem belegten oder zu nahen Feld.
+    if (type !== 'hall' && this.hasNearbyBuilding(x, y, MIN_BUILDING_SPACING_TILES)) return null;
 
     const b = new Building(faction, type, x, y);
     this.buildings.push(b);
@@ -152,7 +156,9 @@ export class VillageManager {
 
     // Gebäude-Kachel → Road (außer Farm bleibt Gras/Sand)
     if (type !== 'farm') {
+      const before = this.grid.get(x, y);
       this.grid.set(x, y, TileType.Road);
+      if (before !== TileType.Road) this.onTerrainChanged?.();
     }
 
     return b;
@@ -167,7 +173,9 @@ export class VillageManager {
       const idx = v.buildings.indexOf(b);
       if (idx !== -1) v.buildings.splice(idx, 1);
     }
+    const before = this.grid.get(b.x, b.y);
     this.grid.set(b.x, b.y, TileType.Ash);
+    if (before !== TileType.Ash) this.onTerrainChanged?.();
     this.onBuildingDestroyed?.();
   }
 
@@ -176,6 +184,7 @@ export class VillageManager {
   makeRoads(faction: FactionKey): void {
     const v = this.villages[faction];
     if (!v) return;
+    let changed = false;
 
     for (const b of v.buildings) {
       let x = b.x;
@@ -186,6 +195,7 @@ export class VillageManager {
         const t = this.grid.get(x, y);
         if (t === TileType.Grass || t === TileType.Sand) {
           this.grid.set(x, y, TileType.Road);
+          changed = true;
         }
         x += x < v.x ? 1 : -1;
       }
@@ -194,16 +204,26 @@ export class VillageManager {
         const t = this.grid.get(x, y);
         if (t === TileType.Grass || t === TileType.Sand) {
           this.grid.set(x, y, TileType.Road);
+          changed = true;
         }
         y += y < v.y ? 1 : -1;
       }
     }
+
+    if (changed) this.onTerrainChanged?.();
   }
 
   // ─── Hilfsmethoden ───────────────────────────────────────────────────────
 
   buildingAt(x: number, y: number): Building | undefined {
     return this.buildings.find(b => !b.dead && b.x === x && b.y === y);
+  }
+
+  hasNearbyBuilding(x: number, y: number, minSpacing: number): boolean {
+    return this.buildings.some(b =>
+      !b.dead &&
+      Math.max(Math.abs(b.x - x), Math.abs(b.y - y)) < minSpacing,
+    );
   }
 
   /** Mittelpunkt aller Dörfer — für Kamera-Start. */

@@ -68,9 +68,9 @@ const config: Phaser.Types.Core.GameConfig = {
     height: CANVAS_H,
   },
   render: {
-    antialias: true,
-    pixelArt: false,
-    roundPixels: false,
+    antialias: false,
+    pixelArt: true,
+    roundPixels: true,
   },
   input: {
     activePointers: 3,

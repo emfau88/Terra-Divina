@@ -23,6 +23,8 @@ import { BALANCE }         from '@game/data/balance';
 import { BuildingType }    from '@game/data/buildingDefs';
 import { BuildSite }       from '@game/factions/Village';
 
+const MIN_BUILDING_SPACING_TILES = 3;
+
 function choice<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -40,6 +42,7 @@ export class ResourceSystem {
    *  damit GameScene Renderer aktualisieren kann. */
   onSpawn:   ((faction: FactionKey) => void) | null = null;
   onBuild:   ((faction: FactionKey) => void) | null = null;
+  onTerrainChanged: (() => void) | null = null;
 
   constructor(
     villages: VillageManager,
@@ -111,7 +114,10 @@ export class ResourceSystem {
     if (here === TileType.Forest && Math.random() < 0.58 * traits.woodGatherMult) {
       u.state = 'chop';
       u.carryWood++;
-      if (Math.random() < 0.08) this.grid.set(u.x, u.y, TileType.Grass);
+      if (Math.random() < 0.08) {
+        this.grid.set(u.x, u.y, TileType.Grass);
+        this.onTerrainChanged?.();
+      }
       // Elfen: passives Heilen im Wald
       if (traits.forestHealPerTick > 0) {
         u.hp = Math.min(u.maxHp, u.hp + traits.forestHealPerTick);
@@ -248,9 +254,8 @@ export class ResourceSystem {
     for (let yy = v.y - radius; yy <= v.y + radius; yy++) {
       for (let xx = v.x - radius; xx <= v.x + radius; xx++) {
         if (!this.grid.isWalkable(xx, yy)) continue;
-        if (this.villages.buildingAt(xx, yy))  continue;
-        // Also block tiles already claimed by another BuildSite
-        if (v.buildSites.some(s => s.x === xx && s.y === yy)) continue;
+        if (this.villages.hasNearbyBuilding(xx, yy, MIN_BUILDING_SPACING_TILES)) continue;
+        if (this.hasNearbyBuildSite(v.buildSites, xx, yy, MIN_BUILDING_SPACING_TILES)) continue;
         const d = dist(xx, yy, v.x, v.y);
         if (d > radius) continue;
         candidates.push({ x: xx, y: yy, d });
@@ -270,6 +275,17 @@ export class ResourceSystem {
       totalTicks:     BALANCE.BUILD_SITE_TICKS,
       assignedUnitId: null,
     };
+  }
+
+  private hasNearbyBuildSite(
+    buildSites: BuildSite[],
+    x: number,
+    y: number,
+    minSpacing: number,
+  ): boolean {
+    return buildSites.some(site =>
+      Math.max(Math.abs(site.x - x), Math.abs(site.y - y)) < minSpacing,
+    );
   }
 
   /**

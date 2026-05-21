@@ -20,6 +20,7 @@ import { HungerSystem }       from '@game/simulation/HungerSystem';
 import { DiplomacySystem, DiplomaticState } from '@game/simulation/DiplomacySystem';
 import { FireSystem }         from '@game/simulation/FireSystem';
 import { EffectSystem }       from '@game/effects/EffectSystem';
+import { PerformanceMonitor, PerfCounts } from '@game/debug/PerformanceMonitor';
 import { ToolController }     from '@game/tools/ToolController';
 import { InspectPanel }       from '@game/ui/InspectPanel';
 import { EventFeed }          from '@game/ui/EventFeed';
@@ -72,6 +73,7 @@ export class GameScene extends Phaser.Scene {
   private creatureRenderer!: CreatureRenderer;
   private cameraController!: CameraController;
   private creatureManager!:  CreatureManager;
+  private perfMonitor!:      PerformanceMonitor;
 
   private readonly worldPixelW = COLS * TILE;
   private readonly worldPixelH = ROWS * TILE;
@@ -113,6 +115,9 @@ export class GameScene extends Phaser.Scene {
     // 3. Einheiten
     this.unitManager = new UnitManager(this.grid, this.villageManager);
     this.unitManager.spawnInitial(cfg.factions);
+
+    this.perfMonitor = new PerformanceMonitor();
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.perfMonitor.destroy());
 
     // 4. Simulations-Systeme
     this.clock          = new SimulationClock();
@@ -176,16 +181,20 @@ export class GameScene extends Phaser.Scene {
       const css = '#' + fc.color.toString(16).padStart(6, '0');
       this.eventFeed.push(`${fc.short} spawnt Einheit`, css);
     };
+    this.resourceSystem.onTerrainChanged = () => {
+      this.flushTerrainDirty();
+    };
     this.resourceSystem.onBuild = (faction) => {
-      this.worldRenderer.drawAll();
       this.buildingRenderer.drawAll(this.villageManager.liveBuildings);
       const fc  = FACTIONS[faction];
       const css = '#' + fc.color.toString(16).padStart(6, '0');
       this.eventFeed.push(`${fc.short} baut Gebäude (L${this.villageManager.villages[faction]?.level ?? 1})`, css);
     };
+    this.villageManager.onTerrainChanged = () => {
+      this.flushTerrainDirty();
+    };
     this.villageManager.onBuildingDestroyed = () => {
       this.diplomacy.addTension(12);
-      this.worldRenderer.drawAll();
       this.buildingRenderer.drawAll(this.villageManager.liveBuildings);
       this.eventFeed.push('Ein Gebäude wurde zerstört!', '#ff9944');
     };
@@ -225,7 +234,7 @@ export class GameScene extends Phaser.Scene {
 
     // 8. Renderer — Reihenfolge: map → fireG → shadow → build → unit → effects
     // fireG liegt direkt über mapG damit Feuer-Flackern das Terrain überlagert
-    const mapG     = this.add.graphics();
+    const mapG     = this.add.renderTexture(0, 0, COLS * TILE, ROWS * TILE).setOrigin(0, 0);
     const fireG    = this.add.graphics();   // Feuer-Flacker-Ebene (nur brennende Kacheln)
     const shadowG  = this.add.graphics();
     const buildG   = this.add.graphics();
@@ -234,16 +243,17 @@ export class GameScene extends Phaser.Scene {
 
     this.worldRenderer = new WorldRenderer(mapG, this.grid, fireG);
     this.worldRenderer.drawAll();
+    this.grid.clearDirtyTiles();
 
-    this.buildingRenderer = new BuildingRenderer(buildG, shadowG);
+    this.buildingRenderer = new BuildingRenderer(this, buildG, shadowG);
     this.buildingRenderer.setVillages(this.villageManager.villages);
     this.buildingRenderer.drawAll(this.villageManager.liveBuildings);
 
-    this.unitRenderer = new UnitRenderer(unitG);
+    this.unitRenderer = new UnitRenderer(this, unitG);
     this.unitRenderer.drawAll(this.unitManager.liveUnits);
 
     const creatureG    = this.add.graphics();
-    this.creatureRenderer = new CreatureRenderer(creatureG);
+    this.creatureRenderer = new CreatureRenderer(this, creatureG);
     this.creatureRenderer.drawAll(this.creatureManager.liveCreatures);
 
     this.effectSystem = new EffectSystem(effectsG);
@@ -390,7 +400,7 @@ export class GameScene extends Phaser.Scene {
         const fy = Math.floor(rows * 0.2 + Math.random() * rows * 0.6);
         this.fireSystem.ignite(fx, fy);
       }
-      this.worldRenderer.drawAll();
+      this.flushTerrainDirty();
     }
 
     // Spielstand wiederherstellen wenn ein Restore-Payload vorhanden ist
@@ -442,24 +452,30 @@ export class GameScene extends Phaser.Scene {
   // ─── Update ──────────────────────────────────────────────────────────────
 
   update(time: number, delta: number): void {
+    const perfFrameStart = performance.now();
+    this.perfMonitor.beginFrame(delta);
     // Zeit wird direkt in drawFireLayer(time) übergeben — kein separates Setzen nötig
 
     if (this.clock.paused) {
       // Auch im Pause Effekte und Feuer animieren
-      this.effectSystem.update(delta);
-      this.effectSystem.drawAll(
-        this.cameras.main.scrollX,
-        this.cameras.main.scrollY,
-        this.cameras.main.scrollY,
-      );
+      this.perfMonitor.measure('effects', () => {
+        this.effectSystem.update(delta);
+        this.effectSystem.drawAll(
+          this.cameras.main.scrollX,
+          this.cameras.main.scrollY,
+          this.cameras.main.scrollY,
+        );
+      });
       if (this.fireSystem.hasFire) {
         this.fireRedrawAccum += delta;
         if (this.fireRedrawAccum >= this.FIRE_REDRAW_MS) {
           this.fireRedrawAccum = 0;
           // Nur fireG neu zeichnen — mapG bleibt unberührt
-          this.worldRenderer.drawFireLayer(time);
+          this.perfMonitor.measure('render', () => this.worldRenderer.drawFireLayer(time));
+          this.perfMonitor.countRedraw('fire');
         }
       }
+      this.finishPerfFrame(perfFrameStart);
       return;
     }
 
@@ -478,26 +494,29 @@ export class GameScene extends Phaser.Scene {
     }
 
     // EffectSystem läuft immer mit echtem delta (nicht skaliert)
-    this.effectSystem.update(delta);
-    this.effectSystem.drawAll(
-      this.cameras.main.scrollX,
-      this.cameras.main.scrollY,
-      this.cameras.main.scrollY,
-    );
+    this.perfMonitor.measure('effects', () => {
+      this.effectSystem.update(delta);
+      this.effectSystem.drawAll(
+        this.cameras.main.scrollX,
+        this.cameras.main.scrollY,
+        this.cameras.main.scrollY,
+      );
+    });
 
     // Feuer-Ausbreitung (eigener Akkumulator im FireSystem)
     const fireTicked = this.fireSystem.tick(scaledDelta);
     if (fireTicked) {
-      // Spread-Tick: mapG neu zeichnen (Kachel-Typwechsel), fireG folgt beim nächsten Flacker-Tick
-      this.worldRenderer.drawAll();
-      this.buildingRenderer.drawAll(this.villageManager.liveBuildings);
-      this.unitRenderer.drawAll(this.unitManager.liveUnits);
+      // Spread-Tick: nur geänderte Terrain-Patches neu zeichnen
+      this.flushTerrainDirty();
+      this.redrawBuildings();
+      this.redrawUnits();
     } else if (this.fireSystem.hasFire) {
       // Flacker-Tick: nur fireG neu zeichnen — mapG bleibt unberührt
       this.fireRedrawAccum += delta;
       if (this.fireRedrawAccum >= this.FIRE_REDRAW_MS) {
         this.fireRedrawAccum = 0;
-        this.worldRenderer.drawFireLayer(time);
+        this.perfMonitor.measure('render', () => this.worldRenderer.drawFireLayer(time));
+        this.perfMonitor.countRedraw('fire');
       }
     }
 
@@ -537,7 +556,7 @@ export class GameScene extends Phaser.Scene {
       }
       // Einheiten-Grafik neu zeichnen wenn sich mindestens eine Einheit bewegt
       if (anyMoving) {
-        this.unitRenderer.drawAll(this.unitManager.liveUnits);
+        this.redrawUnits();
       }
     }
 
@@ -564,7 +583,7 @@ export class GameScene extends Phaser.Scene {
         }
       }
       if (anyMoving) {
-        this.creatureRenderer.drawAll(this.creatureManager.liveCreatures);
+        this.redrawCreatures();
       }
     }
 
@@ -578,20 +597,22 @@ export class GameScene extends Phaser.Scene {
         }
       }
       if (needBuildingRedraw) {
-        this.buildingRenderer.drawAll(this.villageManager.liveBuildings);
+        this.redrawBuildings();
       }
     }
 
     // AI + Hunger
     if (this.aiAccum >= this.AI_INTERVAL_MS) {
       this.aiAccum = 0;
-      this.clock.tick();
-      this.unitManager.tick(1);
-      this.hungerSystem.tick(1);
-      this.creatureManager.tick(this.unitManager.liveUnits);
+      this.perfMonitor.measure('ai', () => {
+        this.clock.tick();
+        this.unitManager.tick(1);
+        this.hungerSystem.tick(1);
+        this.creatureManager.tick(this.unitManager.liveUnits);
+      });
       // Positionen haben sich geändert — neu zeichnen
-      this.unitRenderer.drawAll(this.unitManager.liveUnits);
-      this.creatureRenderer.drawAll(this.creatureManager.liveCreatures);
+      this.redrawUnits();
+      this.redrawCreatures();
       this.inspectPanel.refresh();
       this.eventFeed.update();
       this.pushHudUpdate();
@@ -600,21 +621,60 @@ export class GameScene extends Phaser.Scene {
     // Ressourcen + Dorf + Diplomatie
     if (this.villageAccum >= this.VILLAGE_INTERVAL_MS) {
       this.villageAccum = 0;
-      this.resourceSystem.tick(1);
-      this.diplomacy.tick();
-      this.unitManager.setWarState(this.diplomacy.isWar, this.diplomacy.isTension);
+      this.perfMonitor.measure('village', () => {
+        this.resourceSystem.tick(1);
+        this.diplomacy.tick();
+        this.unitManager.setWarState(this.diplomacy.isWar, this.diplomacy.isTension);
       // Fix 4 — keep BuildingRenderer war state in sync every village tick
-      this.buildingRenderer.setWarState(this.diplomacy.isWar);
-      this.pushHudUpdate();
+        this.buildingRenderer.setWarState(this.diplomacy.isWar);
+        this.pushHudUpdate();
+      });
       // Redraw buildings every village tick when build sites are active
       // (progress bar advances each tick — needs a redraw to show it)
       const hasActiveSites = this.villageManager.allVillages.some(v => v.buildSites.length > 0);
       if (hasActiveSites) {
-        this.buildingRenderer.drawAll(this.villageManager.liveBuildings);
+        this.redrawBuildings();
       }
       // Autosave bei jedem Dorf-Tick (~650 ms Spielzeit)
-      this.saveGame();
+      this.perfMonitor.measure('save', () => this.saveGame());
     }
+    this.finishPerfFrame(perfFrameStart);
+  }
+
+  private flushTerrainDirty(): void {
+    const dirty = this.grid.consumeDirtyTiles();
+    if (dirty.length === 0) return;
+    this.perfMonitor.measure('render', () => this.worldRenderer.redrawTiles(dirty));
+    this.perfMonitor.countRedraw('world');
+  }
+
+  private redrawBuildings(): void {
+    this.perfMonitor.measure('render', () => this.buildingRenderer.drawAll(this.villageManager.liveBuildings));
+    this.perfMonitor.countRedraw('buildings');
+  }
+
+  private redrawUnits(): void {
+    this.perfMonitor.measure('render', () => this.unitRenderer.drawAll(this.unitManager.liveUnits));
+    this.perfMonitor.countRedraw('units');
+  }
+
+  private redrawCreatures(): void {
+    this.perfMonitor.measure('render', () => this.creatureRenderer.drawAll(this.creatureManager.liveCreatures));
+    this.perfMonitor.countRedraw('creatures');
+  }
+
+  private finishPerfFrame(startedAt: number): void {
+    const counts: PerfCounts = {
+      units: this.unitManager.liveUnits.length,
+      creatures: this.creatureManager.liveCreatures.length,
+      buildings: this.villageManager.liveBuildings.length,
+      buildSites: this.villageManager.allVillages.reduce((sum, v) => sum + v.buildSites.length, 0),
+      villages: this.villageManager.allVillages.length,
+      day: this.goalSystem.day,
+      speed: this.clock.speed,
+      paused: this.clock.paused,
+    };
+    this.perfMonitor.endFrame(performance.now() - startedAt, counts);
   }
 
   private pushHudUpdate(): void {
@@ -808,6 +868,7 @@ export class GameScene extends Phaser.Scene {
 
     // ── Renderer neu zeichnen ────────────────────────────────────────────────
     this.worldRenderer.drawAll();
+    this.grid.clearDirtyTiles();
     this.buildingRenderer.drawAll(this.villageManager.liveBuildings);
     this.unitRenderer.drawAll(this.unitManager.liveUnits);
   }

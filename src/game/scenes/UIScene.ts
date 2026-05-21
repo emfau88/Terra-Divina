@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+﻿import Phaser from 'phaser';
 import { GameScene } from './GameScene';
 import { SpeedIndex } from '@game/simulation/SimulationClock';
 import { GOAL_DAYS } from '@game/simulation/GoalSystem';
@@ -23,72 +23,72 @@ interface CategoryDef {
 const CATEGORIES: CategoryDef[] = [
   {
     key: 'destruction',
-    glyph: '💥',
-    label: 'Zerstörung',
-    hint: 'Blitz, Feuer und Meteor verändern die Welt mit Gewalt.',
+    glyph: 'ðŸ’¥',
+    label: 'ZerstÃ¶rung',
+    hint: 'Blitz, Feuer und Meteor verÃ¤ndern die Welt mit Gewalt.',
     tools: [
-      { key: 'lightning', glyph: '⚡', label: 'Blitz'  },
-      { key: 'fire',      glyph: '🔥', label: 'Feuer'  },
-      { key: 'meteor',    glyph: '☄️',  label: 'Meteor' },
+      { key: 'lightning', glyph: 'âš¡', label: 'Blitz'  },
+      { key: 'fire',      glyph: 'ðŸ”¥', label: 'Feuer'  },
+      { key: 'meteor',    glyph: 'â˜„ï¸',  label: 'Meteor' },
     ],
   },
   {
     key: 'nature',
-    glyph: '🌿',
+    glyph: 'ðŸŒ¿',
     label: 'Natur',
     hint: 'Bringe Regen oder heile das Land.',
     tools: [
-      { key: 'rain', glyph: '🌧️', label: 'Regen'  },
-      { key: 'heal', glyph: '✚',  label: 'Heilen' },
+      { key: 'rain', glyph: 'ðŸŒ§ï¸', label: 'Regen'  },
+      { key: 'heal', glyph: 'âœš',  label: 'Heilen' },
     ],
   },
   {
     key: 'civilizations',
-    glyph: '🏘️',
-    label: 'Völker',
+    glyph: 'ðŸ˜ï¸',
+    label: 'VÃ¶lker',
     hint: 'Erschaffe Zivilisationen und beobachte, wie sie wachsen.',
     tools: [
-      { key: 'human', glyph: '👤', label: 'Mensch' },
-      { key: 'orc',   glyph: '👹', label: 'Ork'    },
-      { key: 'elf',   glyph: '🧝', label: 'Elfe'   },
-      { key: 'dwarf', glyph: '⛏️',  label: 'Zwerg'  },
+      { key: 'human', glyph: 'ðŸ‘¤', label: 'Mensch' },
+      { key: 'orc',   glyph: 'ðŸ‘¹', label: 'Ork'    },
+      { key: 'elf',   glyph: 'ðŸ§', label: 'Elfe'   },
+      { key: 'dwarf', glyph: 'â›ï¸',  label: 'Zwerg'  },
     ],
   },
   {
     key: 'creatures',
-    glyph: '🐾',
+    glyph: 'ðŸ¾',
     label: 'Kreaturen',
     hint: 'Setze wilde Kreaturen in die Welt.',
     tools: [
-      { key: 'wolf',  glyph: '🐺', label: 'Wolf'  },
-      { key: 'demon', glyph: '👿', label: 'Dämon' },
+      { key: 'wolf',  glyph: 'ðŸº', label: 'Wolf'  },
+      { key: 'demon', glyph: 'ðŸ‘¿', label: 'DÃ¤mon' },
     ],
   },
   {
     key: 'terrain',
-    glyph: '🗺️',
+    glyph: 'ðŸ—ºï¸',
     label: 'Terrain',
     hint: 'Male das Land neu: Gras, Wasser, Wald, Berge.',
     tools: [
-      { key: 'terrain-grass',    glyph: '🟩', label: 'Gras'   },
-      { key: 'terrain-water',    glyph: '🟦', label: 'Wasser' },
-      { key: 'terrain-forest',   glyph: '🌲', label: 'Wald'   },
-      { key: 'terrain-mountain', glyph: '⛰️',  label: 'Berg'   },
-      { key: 'terrain-sand',     glyph: '🟨', label: 'Sand'   },
+      { key: 'terrain-grass',    glyph: 'ðŸŸ©', label: 'Gras'   },
+      { key: 'terrain-water',    glyph: 'ðŸŸ¦', label: 'Wasser' },
+      { key: 'terrain-forest',   glyph: 'ðŸŒ²', label: 'Wald'   },
+      { key: 'terrain-mountain', glyph: 'â›°ï¸',  label: 'Berg'   },
+      { key: 'terrain-sand',     glyph: 'ðŸŸ¨', label: 'Sand'   },
     ],
   },
   {
     key: 'more',
-    glyph: '⋯',
+    glyph: 'â‹¯',
     label: 'Mehr',
     hint: 'Inspizieren, pausieren und Geschwindigkeit anpassen.',
     tools: [
-      { key: 'inspect', glyph: 'ⓘ', label: 'Info' },
+      { key: 'inspect', glyph: 'â“˜', label: 'Info' },
     ],
   },
 ];
 
-// ─── Category accent colors (used as CSS custom property on each tab) ────────
+// â”€â”€â”€ Category accent colors (used as CSS custom property on each tab) â”€â”€â”€â”€â”€â”€â”€â”€
 const CAT_ACCENT: Record<CategoryKey, string> = {
   destruction:    'var(--accent-danger)',
   nature:         'var(--accent-nature)',
@@ -97,6 +97,21 @@ const CAT_ACCENT: Record<CategoryKey, string> = {
   terrain:        'var(--accent-earth)',
   more:           'var(--muted)',
 };
+
+const TOOL_ASSET_ALIASES: Record<string, string> = {
+  'cat-destruction': 'meteor',
+  'cat-nature': 'heal',
+  'cat-civilizations': 'human',
+  'cat-creatures': 'wolf',
+  'cat-terrain': 'terrain-grass',
+  'cat-more': 'inspect',
+};
+
+function iconAssetMarkup(key: string, fallback: string, label: string): string {
+  const assetKey = TOOL_ASSET_ALIASES[key] ?? key;
+  const src = `assets/ui/tools/${assetKey}.png`;
+  return `<img class="dock-icon-img" src="${src}" alt="" aria-hidden="true" data-fallback="${fallback}" data-label="${label}">`;
+}
 
 export class UIScene extends Phaser.Scene {
   private hudEl!:  HTMLElement;
@@ -122,7 +137,7 @@ export class UIScene extends Phaser.Scene {
     this.buildToolDock();
   }
 
-  // ─── HUD ─────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ HUD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   private buildHud(): void {
     this.hudEl = document.createElement('div');
@@ -148,32 +163,32 @@ export class UIScene extends Phaser.Scene {
       <div class="hud-row hud-row--factions">
         <div class="hud-faction-chip" style="--fc:${hex(fHum.color)}">
           <span class="hud-faction-name">${fHum.short}</span>
-          <span class="hud-faction-val" id="hud-human">—</span>
+          <span class="hud-faction-val" id="hud-human">â€”</span>
         </div>
         <div class="hud-faction-chip" style="--fc:${hex(fOrc.color)}">
           <span class="hud-faction-name">${fOrc.short}</span>
-          <span class="hud-faction-val" id="hud-orc">—</span>
+          <span class="hud-faction-val" id="hud-orc">â€”</span>
         </div>
         <div class="hud-faction-chip" style="--fc:${hex(fElf.color)}">
           <span class="hud-faction-name">${fElf.short}</span>
-          <span class="hud-faction-val" id="hud-elf">—</span>
+          <span class="hud-faction-val" id="hud-elf">â€”</span>
         </div>
         <div class="hud-faction-chip" style="--fc:${hex(fDwarf.color)}">
           <span class="hud-faction-name">${fDwarf.short}</span>
-          <span class="hud-faction-val" id="hud-dwarf">—</span>
+          <span class="hud-faction-val" id="hud-dwarf">â€”</span>
         </div>
       </div>
     `;
     document.body.appendChild(this.hudEl);
   }
 
-  // ─── Tool-Dock ───────────────────────────────────────────────────────────
+  // â”€â”€â”€ Tool-Dock â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   private buildToolDock(): void {
     this.dockEl = document.createElement('div');
     this.dockEl.id = 'tool-dock';
 
-    // ── Category Tab Row ──────────────────────────────────────────────────
+    // â”€â”€ Category Tab Row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const tabRow = document.createElement('div');
     tabRow.className = 'dock-cat-row';
 
@@ -184,7 +199,7 @@ export class UIScene extends Phaser.Scene {
       tab.setAttribute('aria-label', cat.label);
       tab.style.setProperty('--cat-accent', CAT_ACCENT[cat.key]);
 
-      tab.innerHTML = `<span class="cat-icon">${cat.glyph}</span><span class="cat-label">${cat.label}</span>`;
+      tab.innerHTML = `<span class="cat-icon">${iconAssetMarkup(`cat-${cat.key}`, cat.glyph, cat.label)}</span><span class="cat-label">${cat.label}</span>`;
       tab.addEventListener('pointerdown', (e) => {
         e.stopPropagation();
         this.switchCategory(cat.key);
@@ -193,7 +208,7 @@ export class UIScene extends Phaser.Scene {
       tabRow.appendChild(tab);
     }
 
-    // ── Tool Grids ────────────────────────────────────────────────────────
+    // â”€â”€ Tool Grids â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const toolArea = document.createElement('div');
     toolArea.className = 'dock-tool-area';
 
@@ -234,7 +249,7 @@ export class UIScene extends Phaser.Scene {
     btn.setAttribute('aria-label', label);
     btn.style.setProperty('--cat-accent', CAT_ACCENT[catKey]);
 
-    btn.innerHTML = `<span class="tool-glyph">${glyph}</span><span class="tool-label">${label}</span>`;
+    btn.innerHTML = `<span class="tool-glyph">${iconAssetMarkup(key, glyph, label)}</span><span class="tool-label">${label}</span>`;
     btn.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       this.selectTool(key);
@@ -268,7 +283,7 @@ export class UIScene extends Phaser.Scene {
     speedGroup.setAttribute('role', 'group');
     speedGroup.setAttribute('aria-label', 'Spielgeschwindigkeit');
 
-    const speedLabels = ['×1', '×2', '×3', '×4'];
+    const speedLabels = ['Ã—1', 'Ã—2', 'Ã—3', 'Ã—4'];
     this.speedBtns = speedLabels.map((label, i) => {
       const btn = document.createElement('button');
       btn.className = 'speed-btn' + (i === 0 ? ' active' : '');
@@ -290,7 +305,7 @@ export class UIScene extends Phaser.Scene {
     return wrap;
   }
 
-  // ─── Category Switching ──────────────────────────────────────────────────
+  // â”€â”€â”€ Category Switching â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   private switchCategory(key: CategoryKey): void {
     if (key === this.activeCategoryKey) return;
@@ -320,12 +335,11 @@ export class UIScene extends Phaser.Scene {
     }, 2500);
   }
 
-  // ─── Sync helpers ─────────────────────────────────────────────────────────
+  // â”€â”€â”€ Sync helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   private setPauseContent(paused: boolean): void {
-    const glyph = paused ? '▶️' : '⏸️';
     const label = paused ? 'Weiter' : 'Pause';
-    this.pauseBtn.innerHTML = `<span class="tool-glyph">${glyph}</span><span class="tool-label">${label}</span>`;
+    this.pauseBtn.innerHTML = `<span class="tool-glyph">${iconAssetMarkup('pause', label, label)}</span><span class="tool-label">${label}</span>`;
   }
 
   private syncPauseBtn(paused: boolean): void {
@@ -338,7 +352,7 @@ export class UIScene extends Phaser.Scene {
     this.speedBtns.forEach((btn, i) => btn.classList.toggle('active', i === activeIndex));
   }
 
-  // ─── Tool Selection ──────────────────────────────────────────────────────
+  // â”€â”€â”€ Tool Selection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   private selectTool(key: string): void {
     this.activeToolKey = key;
@@ -349,7 +363,7 @@ export class UIScene extends Phaser.Scene {
     if (el) el.textContent = key;
   }
 
-  // ─── Result Overlay ──────────────────────────────────────────────────────
+  // â”€â”€â”€ Result Overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   showResult(won: boolean): void {
     const overlay   = document.getElementById('result-overlay');
@@ -359,20 +373,20 @@ export class UIScene extends Phaser.Scene {
     if (!overlay || !titleEl || !messageEl || !actionBtn) return;
 
     if (won) {
-      titleEl.textContent   = '🌟 Sieg!';
-      messageEl.textContent = `Die Welt hat ${GOAL_DAYS} Tage überlebt. Gut gemacht, Gottheit!`;
+      titleEl.textContent   = 'ðŸŒŸ Sieg!';
+      messageEl.textContent = `Die Welt hat ${GOAL_DAYS} Tage Ã¼berlebt. Gut gemacht, Gottheit!`;
       actionBtn.textContent = 'Weiter beobachten';
     } else {
-      titleEl.textContent   = '💀 Niederlage';
-      messageEl.textContent = 'Alle Dörfer und Einheiten sind untergegangen. Die Welt ist verloren.';
-      actionBtn.textContent = 'Schließen';
+      titleEl.textContent   = 'ðŸ’€ Niederlage';
+      messageEl.textContent = 'Alle DÃ¶rfer und Einheiten sind untergegangen. Die Welt ist verloren.';
+      actionBtn.textContent = 'SchlieÃŸen';
     }
 
     overlay.classList.remove('hidden');
     actionBtn.addEventListener('click', () => overlay.classList.add('hidden'), { once: true });
   }
 
-  // ─── Public API ──────────────────────────────────────────────────────────
+  // â”€â”€â”€ Public API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   setDay(day: number, total?: number): void {
     const el = document.getElementById('hud-day');

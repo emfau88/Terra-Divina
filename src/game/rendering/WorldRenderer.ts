@@ -18,7 +18,7 @@ import { TILE, COLS, ROWS } from '@game/config';
 
 export class WorldRenderer {
   /** Statische Terrain-Ebene — nur bei Kachel-Typwechseln neu gezeichnet. */
-  private readonly mapG:  Phaser.GameObjects.Graphics;
+  private readonly mapG:  Phaser.GameObjects.RenderTexture;
   /** Feuer-Flacker-Ebene — wird unabhängig vom Terrain animiert. */
   private readonly fireG: Phaser.GameObjects.Graphics;
   private readonly grid:  WorldGrid;
@@ -26,7 +26,7 @@ export class WorldRenderer {
   /** Wird in update() von GameScene gesetzt, damit Feuer flackert. */
   time: number = 0;
 
-  constructor(mapGraphics: Phaser.GameObjects.Graphics, grid: WorldGrid, fireGraphics: Phaser.GameObjects.Graphics) {
+  constructor(mapGraphics: Phaser.GameObjects.RenderTexture, grid: WorldGrid, fireGraphics: Phaser.GameObjects.Graphics) {
     this.mapG  = mapGraphics;
     this.fireG = fireGraphics;
     this.grid  = grid;
@@ -44,6 +44,33 @@ export class WorldRenderer {
     }
   }
 
+  redrawPatch(cx: number, cy: number, radius = 1): void {
+    const tiles: Array<{ x: number; y: number }> = [];
+    for (let y = cy - radius; y <= cy + radius; y++) {
+      for (let x = cx - radius; x <= cx + radius; x++) {
+        tiles.push({ x, y });
+      }
+    }
+    this.redrawTiles(tiles);
+  }
+
+  redrawTiles(tiles: Array<{ x: number; y: number }>): void {
+    const seen = new Set<number>();
+    for (const tile of tiles) {
+      for (let oy = -1; oy <= 1; oy++) {
+        for (let ox = -1; ox <= 1; ox++) {
+          const x = tile.x + ox;
+          const y = tile.y + oy;
+          if (x < 0 || x >= COLS || y < 0 || y >= ROWS) continue;
+          const idx = y * COLS + x;
+          if (seen.has(idx)) continue;
+          seen.add(idx);
+          this.drawTile(x, y);
+        }
+      }
+    }
+  }
+
   // ─── Einzelne Kachel auf mapG ─────────────────────────────────────────────
 
   drawTile(x: number, y: number): void {
@@ -56,34 +83,100 @@ export class WorldRenderer {
     // Feuer-Kacheln werden auf mapG als verkohlter Boden dargestellt.
     // Das Flackern übernimmt ausschließlich fireG via drawFireLayer().
     const renderType = t === TileType.Fire ? TileType.Ash : t;
-    g.fillStyle(WorldRenderer.tileColor(renderType, m.variant), 1);
-    g.fillRect(px, py, TILE, TILE);
+    const textureKey = this.baseTextureKeyFor(renderType);
+
+    if (textureKey && this.mapG.scene.textures.exists(textureKey)) {
+      g.stamp(textureKey, undefined, px, py, { originX: 0, originY: 0 });
+    } else {
+      g.fill(WorldRenderer.tileColor(renderType, m.variant), 1, px, py, TILE, TILE);
+    }
+
+    this.drawTerrainOverlays(x, y, renderType, px, py);
+    this.drawTerrainDecor(x, y, renderType, m.variant, m.decor, px, py);
 
     // ─── Dekor ──────────────────────────────────────────────────────────────
-
-    if (t === TileType.Water && m.variant > 0.78) {
-      g.fillStyle(0x65a7d8, 0.18);
-      g.fillRoundedRect(px + 4, py + 5, 8, 3, 2);
-    }
-
-    if (t === TileType.Forest) {
-      g.fillStyle(0x145a2e, 0.82);
-      g.fillCircle(px + 9, py + 8, 6);
-      g.fillStyle(0x0e3b22, 0.75);
-      g.fillCircle(px + 6, py + 11, 4);
-    }
-
-    if (t === TileType.Mountain) {
-      g.fillStyle(0xb9b9b0, 0.75);
-      g.fillTriangle(px + 9, py + 3, px + 3, py + 15, px + 15, py + 15);
-      g.fillStyle(0xffffff, 0.52);
-      g.fillTriangle(px + 9, py + 3, px + 7, py + 8, px + 11, py + 8);
-    }
 
     // Feuer wird NICHT hier gezeichnet — nur auf fireG via drawFireLayer()
   }
 
   // ─── Feuer-Flacker-Layer (nur fireG, nicht mapG) ─────────────────────────
+
+  private baseTextureKeyFor(t: TileType): string {
+    switch (t) {
+      case TileType.Water:
+        return 'terrain-base-water';
+      case TileType.Sand:
+        return 'terrain-base-sand';
+      case TileType.Grass:
+      case TileType.Forest:
+        return 'terrain-base-grass';
+      case TileType.Mountain:
+        return 'terrain-base-stone';
+      case TileType.Ash:
+      case TileType.Fire:
+        return 'terrain-base-ash';
+      default:
+        return '';
+    }
+  }
+
+  private drawTerrainOverlays(x: number, y: number, t: TileType, px: number, py: number): void {
+    if (t === TileType.Water || t === TileType.Ash || t === TileType.Fire) return;
+
+    this.stampOverlayIfNeighbor(x, y, TileType.Water, 'coast-n', 0, -1, px, py);
+    this.stampOverlayIfNeighbor(x, y, TileType.Water, 'coast-e', 1, 0, px, py);
+    this.stampOverlayIfNeighbor(x, y, TileType.Water, 'coast-s', 0, 1, px, py);
+    this.stampOverlayIfNeighbor(x, y, TileType.Water, 'coast-w', -1, 0, px, py);
+
+    if (t === TileType.Grass || t === TileType.Forest || t === TileType.Mountain) {
+      this.stampOverlayIfNeighbor(x, y, TileType.Sand, 'grass-sand-n', 0, -1, px, py);
+      this.stampOverlayIfNeighbor(x, y, TileType.Sand, 'grass-sand-e', 1, 0, px, py);
+      this.stampOverlayIfNeighbor(x, y, TileType.Sand, 'grass-sand-s', 0, 1, px, py);
+      this.stampOverlayIfNeighbor(x, y, TileType.Sand, 'grass-sand-w', -1, 0, px, py);
+    }
+  }
+
+  private drawTerrainDecor(
+    x: number,
+    y: number,
+    t: TileType,
+    variant: number,
+    decor: boolean,
+    px: number,
+    py: number,
+  ): void {
+    let key = '';
+    if (t === TileType.Forest) key = variant > 0.48 ? 'terrain-decor-tree-cluster-01' : 'terrain-decor-tree-01';
+    else if (t === TileType.Mountain) key = variant > 0.42 ? 'terrain-decor-mountain-01' : 'terrain-decor-rock-01';
+    else if (decor && t === TileType.Grass) key = variant > 0.5 ? 'terrain-decor-bush-01' : 'terrain-decor-flower-01';
+    else if (decor && t === TileType.Sand) key = 'terrain-decor-rock-01';
+
+    if (key && this.mapG.scene.textures.exists(key)) {
+      const jitterX = ((x * 5 + y * 3) % 3) - 1;
+      const jitterY = ((x * 2 + y * 7) % 3) - 1;
+      this.mapG.stamp(key, undefined, px + jitterX, py + jitterY, { originX: 0, originY: 0 });
+    }
+  }
+
+  private stampOverlayIfNeighbor(
+    x: number,
+    y: number,
+    type: TileType,
+    overlay: string,
+    dx: number,
+    dy: number,
+    px: number,
+    py: number,
+  ): void {
+    const nx = x + dx;
+    const ny = y + dy;
+    if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || this.grid.get(nx, ny) !== type) return;
+
+    const key = `terrain-overlay-${overlay}`;
+    if (this.mapG.scene.textures.exists(key)) {
+      this.mapG.stamp(key, undefined, px, py, { originX: 0, originY: 0 });
+    }
+  }
 
   /**
    * Löscht fireG und zeichnet nur die aktuell brennenden Kacheln neu.

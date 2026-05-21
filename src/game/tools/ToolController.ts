@@ -129,7 +129,7 @@ export class ToolController {
     this.feed.push('⚡ Blitz schlägt ein', '#b6f3ff');
 
     // 5. Renderer
-    this.worldRenderer.drawAll();
+    this.redrawTerrainDirty();
     this.unitRenderer.drawAll(this.units.liveUnits);
     return 'ok';
   }
@@ -148,7 +148,7 @@ export class ToolController {
     this.feed.push('🔥 Feuer bricht aus', '#ff9944');
 
     // 4. Renderer
-    this.worldRenderer.drawAll();
+    this.redrawTerrainDirty();
     return 'ok';
   }
 
@@ -165,7 +165,7 @@ export class ToolController {
     this.feed.push('🌧 Regen löscht das Feuer', '#89c7ff');
 
     // 4. Renderer
-    this.worldRenderer.drawAll();
+    this.redrawTerrainDirty();
     this.unitRenderer.drawAll(this.units.liveUnits);
     return 'ok';
   }
@@ -181,7 +181,7 @@ export class ToolController {
       applyMeteor(tx, ty, this.grid, this.fire, this.villages, this.units);
       // EventFeed-Meldung beim Einschlag
       this.feed.push('☄ Meteor schlägt ein!', '#ff9d41');
-      this.worldRenderer.drawAll();
+      this.redrawTerrainDirty();
       this.buildingRenderer.drawAll(this.villages.liveBuildings);
       this.unitRenderer.drawAll(this.units.liveUnits);
     });
@@ -256,7 +256,7 @@ export class ToolController {
     }
 
     this.grid.set(tx, ty, type);
-    this.worldRenderer.drawAll();
+    this.redrawTerrainDirty();
     this.feed.push(`🌍 Terrain geändert: ${this.terrainLabel(type)}`, '#9fb3c8');
     return 'ok';
   }
@@ -264,6 +264,12 @@ export class ToolController {
   /**
    * Gibt den deutschen Anzeigenamen für einen Kachel-Typ zurück.
    */
+  private redrawTerrainDirty(): void {
+    const dirty = this.grid.consumeDirtyTiles();
+    if (dirty.length === 0) return;
+    this.worldRenderer.redrawTiles(dirty);
+  }
+
   private terrainLabel(type: TileType): string {
     const map: Partial<Record<TileType, string>> = {
       [TileType.Grass]:    'Gras',
